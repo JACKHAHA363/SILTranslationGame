@@ -1,0 +1,36 @@
+{
+    "experiment": "01_lm_wiki2",
+
+    "dataset": "wikitext2",
+    "load_dataset" : true,
+    "save_dataset" : false,
+
+    "setup": "lm",
+    "model": "RNN",
+
+    "mode": "train",
+    "seed": 19920722,
+
+    "D_emb D_hid n_layers": [
+        [256, 256, 1],
+        [512, 512, 2]
+    ],
+    "n_dir": 1,
+
+    "eval_every": 500,
+    "batch_size": 128,
+    "seq_len": 50,
+
+    "early_stop": true,
+    "patience": 50,
+    "drop_ratio": [0.2, 0.4],
+
+    "rep_pen_co": [0.0, 0.0001, 0.0003, 0.001, 0.003],
+
+    "optimizer": "SGD",
+    "grad_clip": [0.1],
+    "lr": [20],
+    "anneal_by": [0.25],
+
+    "debug": false
+}

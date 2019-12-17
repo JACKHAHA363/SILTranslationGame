@@ -1,0 +1,40 @@
+{
+    "experiment": "02_fr_en",
+
+    "dataset": "iwslt",
+
+    "model": ["RNN", "RNNAttn"],
+    "setup": "single",
+    "pair": "fr_en",
+
+    "mode": "train",
+    "seed": 19920722,
+
+    "tie_emb": true,
+
+    "D_emb": 512,
+    "D_hid": 1024,
+    "D_att": 1024,
+    "D_out": [1024],
+    "n_layers": 1,
+    "n_dir": 2,
+
+    "eval_every": 1000,
+    "batch_size": 1024,
+    "drop_ratio": [0.1, 0.3],
+
+    "optimizer": "Adam",
+    "grad_clip": 1.0,
+    "lr": [3e-3, 1e-3, 3e-4],
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": [30000],
+    "max_training_steps": 100000000,
+
+    "send_method": "argmax",
+    "decode_how": "greedy",
+    "max_len_gen": 50,
+    "msg_len_ratio": -1.0,
+
+    "debug": false
+}

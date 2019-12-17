@@ -1,0 +1,41 @@
+{
+    "experiment": "03_ranker",
+
+    "dataset": "multi30k",
+    "load_dataset" : true,
+    "save_dataset" : false,
+
+    "model": "RNN",
+    "setup": "ranker",
+
+    "mode": "train",
+    "seed": 19920722,
+
+    "D_emb": 128,
+    "D_hid": 128,
+    "n_layers": 1,
+    "n_dir": 1,
+    "input_feeding": false,
+
+    "eval_every": 500,
+    "batch_size": 256,
+    "early_stop": false,
+    "patience": 100,
+    "training_max_len": null,
+    "drop_ratio": [0.1, 0.2, 0.3],
+
+    "img_pred_loss": ["vse"],
+    "margin" : [0.1, 0.2, 0.3],
+    "D_img": [512],
+
+    "optimizer": "Adam",
+    "grad_clip": [0.1, 1.0],
+    "plot_grad": false,
+    "lr": [3e-4, 1e-4],
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": [300000],
+    "max_training_steps": 100000000,
+
+    "debug": false
+}

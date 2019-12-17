@@ -1,0 +1,58 @@
+{
+    "experiment": "06_exp123",
+
+    "dataset": "multi30k",
+    "load_dataset" : true,
+    "save_dataset" : false,
+
+    "model": "RNNAttn",
+    "setup": "joint",
+    "input_feeding": true,
+
+    "mode": "train",
+    "seed": 19920722,
+
+    "D_emb": 256,
+    "D_hid": 256,
+    "n_layers": 1,
+    "n_dir": 1,
+
+    "ce_co": 1.0,
+    "b_co": [1.0, 10.0, 100.0],
+    "pg_co": [1.0, 10.0, 100.0],
+    "h_co": [0.0, 0.001],
+
+    "eval_every": 500,
+    "batch_size": 256,
+    "early_stop": true,
+    "patience": 100,
+    "training_max_len": null,
+    "drop_ratio": [0.1],
+
+    "optimizer": "Adam",
+    "grad_clip": [0.1],
+    "lr": [1e-4],
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": [100000],
+    "max_training_steps": 100000000,
+
+    "cpt_iter": "best",
+
+    "use_en_lm": true,
+    "train_en_lm": false,
+    "en_lm_nll_co": [0.1],
+
+    "use_ranker": true,
+    "train_ranker": false,
+    "img_pred_loss": "nll",
+    "img_pred_loss_co": [0.0],
+    "D_img": 512,
+
+    "send_method": "reinforce",
+    "decode_how": "greedy",
+    "max_len_gen": 50,
+    "msg_len_ratio": 1.0,
+
+    "debug": false
+}

@@ -1,0 +1,49 @@
+{
+    "experiment": "02_joint_exp2",
+
+    "dataset": "multi30k",
+    "load_dataset" : true,
+    "save_dataset" : false,
+
+    "model": "RNNAttn",
+    "setup": "joint",
+
+    "mode": "train",
+    "seed": 19920722,
+
+    "D_emb": 256,
+    "D_hid": 256,
+    "n_layers": 1,
+    "n_dir": 1,
+
+    "ce_coeff": 1.0,
+    "b_coeff": [10.0],
+    "pg_coeff": [1.0],
+    "h_coeff": [0.0, 0.001],
+
+    "eval_every": 200,
+    "batch_size": 1000,
+    "training_max_len": null,
+    "drop_ratio": [0.0],
+
+    "optimizer": "Adam",
+    "grad_clip": [0.1],
+    "lr": [1e-4],
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": [100000],
+    "max_training_steps": 100000000,
+
+    "cpt_iter": [100, 1000, 5000, 7000, 10000, 20000, 30000, 60000, 200000, -1],
+
+    "use_en_lm": true,
+    "train_en_lm": true,
+    "en_lm_nll_coeff": [0.003, 0.01, 0.03],
+
+    "send_method": "reinforce",
+    "decode_how": "greedy",
+    "max_len_gen": 50,
+    "msg_len_ratio": 1.0,
+
+    "debug": false
+}
