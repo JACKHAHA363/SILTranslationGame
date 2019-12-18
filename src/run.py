@@ -12,6 +12,7 @@ import random
 import ipdb
 import argparse
 import time
+import os
 from pathlib import Path
 
 from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, data_path, \
@@ -21,18 +22,19 @@ from agents import Agents
 from agent import RNNAttn, ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params, get_hp_str
 
-main_path = "/checkpoint/jasonleeinf/groundcomms/"
-home_path = "/private/home/jasonleeinf/scratch/groundcomms/src/"
+home_path = os.path.dirname(os.path.abspath(__file__))
+main_path = os.path.dirname(home_path)
 
 if "single" in sys.argv:
-    args = Params(home_path + "hyperparams_single.json")
+    args = Params(os.path.join(home_path, "hyperparams_single.json"))
 elif "joint" in sys.argv:
-    args = Params(home_path + "hyperparams_joint.json")
+    args = Params(os.path.join(home_path, "hyperparams_joint.json"))
 elif "ranker" in sys.argv:
-    args = Params(home_path + "hyperparams_ranker.json")
+    args = Params(os.path.join(home_path, "hyperparams_ranker.json"))
 elif "lm" in sys.argv:
-    args = Params(home_path + "hyperparams_lm.json")
+    args = Params(os.path.join(home_path, "hyperparams_lm.json"))
 
+import ipdb; ipdb.set_trace()
 args.update_argv(sys.argv)
 
 folders = ["event", "model", "log", "param"]
