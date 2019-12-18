@@ -11,6 +11,8 @@ from utils import write_tb
 from metrics import Metrics, Best
 from misc.bleu import computeBLEU, compute_bp, print_bleu
 from pathlib import Path
+from os.path import join
+
 
 def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, test_set="valid"):
     with torch.no_grad():
@@ -18,7 +20,6 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
         src_corpus, trg_corpus, hyp_corpus = [], [], []
 
         for j, dev_batch in enumerate(dev_it):
-            batch_size = len(dev_batch)
             if args.dataset == "iwslt":
                 src, src_len = dev_batch.src
                 trg, trg_len = dev_batch.trg
@@ -26,7 +27,7 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
                 src_lang, trg_lang = args.pair.split("_")
                 src, src_len = dev_batch.__dict__[src_lang]
                 trg, trg_len = dev_batch.__dict__[trg_lang]
-
+            import ipdb; ipdb.set_trace()
             logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
             nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), size_average=True,
                                   ignore_index=0, reduce=True)
@@ -52,6 +53,7 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
 
     return bleu
 
+
 def train_model(args, model, iterators):
     (train_it, dev_it) = iterators
 
@@ -59,7 +61,7 @@ def train_model(args, model, iterators):
         decoding_path = Path(args.decoding_path + args.id_str)
         decoding_path.mkdir(parents=True, exist_ok=True)
         from tensorboardX import SummaryWriter
-        writer = SummaryWriter( args.event_path + args.id_str)
+        writer = SummaryWriter(join(args.event_path + args.id_str))
 
     params = [p for p in model.parameters() if p.requires_grad]
     if args.optimizer == 'Adam':
@@ -68,9 +70,10 @@ def train_model(args, model, iterators):
         raise NotImplementedError
 
     extra_loss_names = []
-    train_metrics = Metrics('train_loss', 'nll', *extra_loss_names, data_type = "avg")
-    dev_metrics = Metrics('dev_loss', 'nll', *extra_loss_names, data_type = "avg")
-    best = Best(max, 'dev_bleu', 'iters', model=model, opt=opt, path= args.model_path + args.id_str, gpu=args.gpu, debug=args.debug)
+    train_metrics = Metrics('train_loss', 'nll', *extra_loss_names, data_type="avg")
+    dev_metrics = Metrics('dev_loss', 'nll', *extra_loss_names, data_type="avg")
+    best = Best(max, 'dev_bleu', 'iters', model=model, opt=opt, path=join(args.model_path, args.id_str),
+                gpu=args.gpu, debug=args.debug)
 
     for iters, train_batch in enumerate(train_it):
         if iters >= args.max_training_steps:

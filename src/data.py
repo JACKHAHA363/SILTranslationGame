@@ -50,7 +50,7 @@ def build_dataset(args, dataset):
         vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
 
         for (field, vocab) in zip([SRC, TRG], vocabs):
-            field.vocab = TextVocab(itos=torch.load(join(vocab_path, vocab)))
+            field.vocab = TextVocab(counter=torch.load(join(vocab_path, vocab)))
 
         train_path = join(vocab_path, 'iwslt', pair, 'train.' + pair)
         dev_path = join(vocab_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
@@ -69,8 +69,9 @@ def build_dataset(args, dataset):
         dev_it = data.BucketIterator(dev_data, args.batch_size, device=device,
                                      batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
                                      sort=False, sort_within_batch=True)
-
-        args.__dict__.update({'src':SRC, "trg":TRG, 'voc_sz_src':len(SRC.vocab), 'voc_sz_trg':len(TRG.vocab)})
+        args.__dict__.update({'src': SRC, "trg": TRG,
+                              'voc_sz_src': len(SRC.vocab),
+                              'voc_sz_trg': len(TRG.vocab)})
 
     elif dataset == "multi30k":
         FR   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
@@ -203,48 +204,20 @@ def data_path(dataset, args):
         return
 """
 
+
 class TextVocab(vocab.Vocab):
-    def __init__(self, counter=None, max_size=None, min_freq=1, specials=['<pad>'],
-                 vectors=None, unk_init=None, vectors_cache=None, itos=None):
-        if itos is None:
-            self.freqs = counter
-            counter = counter.copy()
-            min_freq = max(min_freq, 1)
-
-            self.itos = list(specials)
-            # frequencies of special tokens are not counted when building vocabulary
-            # in frequency order
-            for tok in specials:
-                del counter[tok]
-
-            max_size = None if max_size is None else max_size + len(self.itos)
-
-            # sort by frequency, then alphabetically
-            words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
-            words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
-
-            for word, freq in words_and_frequencies:
-                if freq < min_freq or len(self.itos) == max_size:
-                    break
-                self.itos.append(word)
-        else:
-            self.itos = itos
-
-        self.stoi = defaultdict(_default_unk_index)
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
-
-        self.vectors = None
-        if vectors is not None:
-            self.load_vectors(vectors, unk_init=unk_init, cache=vectors_cache)
-        else:
-            assert unk_init is None and vectors_cache is None
+    def __init__(self, counter):
+        super(TextVocab, self).__init__(counter=counter,
+                                        specials=['<BOS>', '<UNK>',
+                                                  '<EOS>', '<PAD>'],
+                                        specials_first=True)
 
 
 # load the dataset + reversible tokenization
 class NormalField(data.Field):
 
     def reverse(self, batch, unbpe=True):
+        import ipdb; ipdb.set_trace()
         if isinstance(batch, torch.Tensor):
             if not self.batch_first:
                 batch = batch.t()
@@ -261,15 +234,15 @@ class NormalField(data.Field):
                 sentence.append(w)
             return sentence
 
-        batch = [ trim(ex, self.eos_token) for ex in batch] # trim past frst eos
+        batch = [trim(ex, self.eos_token) for ex in batch] # trim past frst eos
 
         def filter_special(tok):
             return tok not in (self.init_token, self.pad_token)
 
         if unbpe:
-            batch = [ " ".join(filter(filter_special, ex)).replace("@@ ","") for ex in batch]
+            batch = [" ".join(filter(filter_special, ex)).replace("@@ ", "") for ex in batch]
         else:
-            batch = [ " ".join(filter(filter_special, ex) ) for ex in batch]
+            batch = [" ".join(filter(filter_special, ex) ) for ex in batch]
         return batch
 
     def build_vocab(self, *args, **kwargs):

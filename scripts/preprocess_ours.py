@@ -217,10 +217,11 @@ apply_bpe_iwslt(EN, DE)
 Converting vocab to itos
 """
 import torch
+from collections import Counter
 for lang in [FR, EN, DE]:
-    itos = []
+    counter = Counter()
     with open(join(ROOT_BPE_DIR, 'vocab' + lang)) as f:
-        line = f.readline()
-        word = line.split(' ')[0]
-        itos.append(word)
-    torch.save(itos, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
+        for line in f:
+            word, freq = line.rstrip('\n').split(' ')
+            counter[word] = int(freq)
+    torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))

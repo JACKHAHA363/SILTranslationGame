@@ -1,17 +1,9 @@
-import copy
 import sys
 import torch
-import torch.nn as nn
 import numpy as np
-from torchtext import data, datasets
 
-import os
 from time import gmtime, strftime, localtime
-import logging
-import random
-import ipdb
-import argparse
-import time
+from os.path import join
 import os
 from pathlib import Path
 
@@ -107,7 +99,7 @@ if args.gpu > -1 and torch.cuda.is_available():
 else:
     map_location = lambda storage, loc: storage
 
-model_path = "/checkpoint/jasonleeinf/groundcomms/model/{}/{}_best.pt"
+model_path = join(main_path, 'model/{}/{}_best.pt')
 # Loading EN LM
 extra_input = {"en_lm":None, "img":{"multi30k":[None,None]}, "ranker":None}
 if args.setup == "joint" and args.use_en_lm:
