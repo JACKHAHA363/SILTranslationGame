@@ -165,8 +165,8 @@ def _apply_bpe(in_file, out_file, lang):
     """ Apply BPE """
     codes_file = join(ROOT_BPE_DIR, 'bpe.codes')
     assert os.path.exists(codes_file), '{} not exists!'.format(codes_file)
-    vocab_file = join(ROOT_BPE_IRD, 'vocab' + lang)
-    cmd = ['subword-nmt', 'apply-pbe']
+    vocab_file = join(ROOT_BPE_DIR, 'vocab' + lang)
+    cmd = ['subword-nmt', 'apply-bpe']
     cmd += ['-c', codes_file]
     cmd += ['--vocabulary', vocab_file]
     cmd += ['--vocabulary-threshold', str(MIN_FREQ)]

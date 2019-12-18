@@ -1,4 +1,9 @@
 .idea/
 __pycache__/
 *.pyc
-
+figs
+event
+decoding
+log
+model
+param

@@ -180,16 +180,8 @@ def cuda(x):
     return x
 
 def which_machine():
-    if    "vine" in os.uname()[1] \
-       or "weaver" in os.uname()[1] \
-       or "dgx" in os.uname()[1] \
-       or "cassio" in os.uname()[1] \
-       or "lion" in os.uname()[1]:
-        return "nyu"
-
-    elif "fair" in os.uname()[1]:
-        return "fair"
-
+    if "mila" in os.uname()[1]:
+        return "mila"
     else:
         raise Exception
 

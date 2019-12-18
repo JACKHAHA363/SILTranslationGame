@@ -34,7 +34,6 @@ elif "ranker" in sys.argv:
 elif "lm" in sys.argv:
     args = Params(os.path.join(home_path, "hyperparams_lm.json"))
 
-import ipdb; ipdb.set_trace()
 args.update_argv(sys.argv)
 
 folders = ["event", "model", "log", "param"]
@@ -45,7 +44,7 @@ if args.mode == "train":
     for name in folders:
         folder = "{}/{}_{}/".format(name, args.date, args.experiment) \
                 if hasattr(args, "date") and hasattr(args, "experiment") else name + '/'
-        args.__dict__["{}_path".format(name)] = main_path + folder
+        args.__dict__["{}_path".format(name)] = os.path.join(main_path, folder)
         if not args.debug:
             Path(args.__dict__["{}_path".format(name)]).mkdir(parents=True, exist_ok=True)
 
