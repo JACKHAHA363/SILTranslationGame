@@ -12,6 +12,7 @@ from torch.distributions import Categorical
 from utils import cuda, xlen_to_inv_mask, gumbel_softmax_hard
 from modules import ArgsModule
 
+
 class AttentionLayer(Module):
     def __init__(self, D_key, D_query):
         super(AttentionLayer, self).__init__()
@@ -32,9 +33,9 @@ class AttentionLayer(Module):
         attn_scores = (query * x[:,None,:]).sum(dim=2) # (batch_size, x_seq_len)
 
         attn_scores = attn_scores.float().masked_fill_(
-            encoder_padding_mask,
+            encoder_padding_mask.bool(),
             float('-inf')
-        ).type_as(attn_scores)
+        )
 
         attn_scores = F.softmax(attn_scores, dim=1) # (batch_size, x_seq_len)
 
@@ -42,6 +43,7 @@ class AttentionLayer(Module):
 
         x = torch.tanh( self.W_q( torch.cat( [x, key], dim=1) ) )
         return x, attn_scores # batch_size x D_query
+
 
 class RNNDecAttn(ArgsModule):
     def __init__(self, args, voc_sz_trg):
@@ -114,18 +116,18 @@ class RNNDecAttn(ArgsModule):
         batch_size, x_seq_len = src_hid.size()[:2]
         src_mask = xlen_to_inv_mask(src_len, seq_len=x_seq_len) # (batch_size, x_seq_len)
         y_seq_len = math.floor(trg_len.max().item() * self.msg_len_ratio) \
-                if self.msg_len_ratio > 0 else self.max_len_gen
+            if self.msg_len_ratio > 0 else self.max_len_gen
 
         h_index = (src_len - 1)[:,None,None].repeat(1, 1, src_hid.size(2))
         z_t = torch.cumsum(src_hid, dim=1) # (batch_size, x_seq_len, D_hid * n_dir)
         z_t = z_t.gather(dim=1, index=h_index).view(batch_size, -1) # (batch_size, D_hid * n_dir)
-        z_t = torch.div( z_t, src_len[:, None].float() )
+        z_t = torch.div(z_t, src_len[:, None].float())
 
         y_emb = cuda( torch.full((batch_size,), self.init_token).long() )
         y_emb = self.emb( y_emb ) # (batch_size, D_emb)
         #y_emb = F.dropout( y_emb, p=self.drop_ratio, training=self.training )
 
-        prev_trg_hids = [z_t for i in range(self.n_layers)]
+        prev_trg_hids = [z_t for _ in range(self.n_layers)]
         trg_hid = prev_trg_hids[0]
         input_feed = y_emb.data.new(batch_size, self.D_hid).zero_()
 
@@ -178,12 +180,13 @@ class RNNDecAttn(ArgsModule):
 
                 #if idx >= self.min_len_gen:
                 self.neg_Hs.append( -1 * tok_dist.entropy() )
+            else:
+                raise ValueError
 
             msg.append(tokens)
-
-            is_next_eos = ( tokens == eos_tensor ).long() # (batch_size)
-            new_seq_lens = max_seq_lens.clone().masked_fill_(mask=is_next_eos.byte(), \
-                           value=float(idx+1)) # NOTE idx+1 ensures this is valid length
+            is_next_eos = (tokens == eos_tensor ).long() # (batch_size)
+            new_seq_lens = max_seq_lens.clone().masked_fill_(mask=is_next_eos.bool(),
+                                                             value=float(idx+1)) # NOTE idx+1 ensures this is valid length
             seq_lens = torch.min(seq_lens, new_seq_lens) # (contains lengths)
 
             done = (done + is_next_eos).clamp(min=0, max=1).long()

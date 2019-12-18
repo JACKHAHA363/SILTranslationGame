@@ -1,4 +1,3 @@
-import ipdb
 import operator
 import torch
 import math
@@ -40,6 +39,7 @@ class RNN(ArgsModule):
             hyp = self.dec.beam_search(hid, x_len, beam_width)
         return hyp
 
+
 class RNNAttn(ArgsModule):
     def __init__(self, args, voc_sz_src, voc_sz_trg):
         super(RNNAttn, self).__init__(args)
@@ -60,6 +60,7 @@ class RNNAttn(ArgsModule):
         elif decode_method == "beam":
             hyp = self.dec.beam(hid, x_len)
         return hyp
+
 
 class ImageGrounding(ArgsModule):
     def __init__(self, args, voc_sz):

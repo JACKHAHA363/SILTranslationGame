@@ -174,8 +174,6 @@ def build_dataset(args, dataset):
 
     return train_it, dev_it
 
-def _default_unk_index():
-    return 1
 
 """
 def data_path(dataset, args):
@@ -217,7 +215,6 @@ class TextVocab(vocab.Vocab):
 class NormalField(data.Field):
 
     def reverse(self, batch, unbpe=True):
-        import ipdb; ipdb.set_trace()
         if isinstance(batch, torch.Tensor):
             if not self.batch_first:
                 batch = batch.t()

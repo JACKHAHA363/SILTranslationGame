@@ -25,6 +25,8 @@ elif "ranker" in sys.argv:
     args = Params(os.path.join(home_path, "hyperparams_ranker.json"))
 elif "lm" in sys.argv:
     args = Params(os.path.join(home_path, "hyperparams_lm.json"))
+else:
+    raise ValueError
 
 args.update_argv(sys.argv)
 

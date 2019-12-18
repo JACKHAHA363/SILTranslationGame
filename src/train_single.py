@@ -27,18 +27,15 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
                 src_lang, trg_lang = args.pair.split("_")
                 src, src_len = dev_batch.__dict__[src_lang]
                 trg, trg_len = dev_batch.__dict__[trg_lang]
-            import ipdb; ipdb.set_trace()
             logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
-            nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), size_average=True,
-                                  ignore_index=0, reduce=True)
+            nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1),
+                                  ignore_index=0, reduction='mean')
             num_trg = (trg[:,1:] != 0).sum().item()
-
             dev_metrics.accumulate(num_trg, nll.item())
-
             hyp = model.decode(src, src_len, decode_method, beam_width)
-            src_corpus.extend( args.src.reverse( src ) )
-            trg_corpus.extend( args.trg.reverse( trg ) )
-            hyp_corpus.extend( args.trg.reverse( hyp ) )
+            src_corpus.extend(args.src.reverse(src))
+            trg_corpus.extend(args.trg.reverse(trg))
+            hyp_corpus.extend(args.trg.reverse(hyp))
 
         bleu = computeBLEU(hyp_corpus, trg_corpus, corpus=True)
         args.logger.info(dev_metrics)
@@ -46,11 +43,11 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
         args.logger.info('model:' + args.prefix + args.hp_str)
 
         if not args.debug:
-            src, trg, hyp = [ Path( args.decoding_path ) / args.id_str / which for which in "src trg hyp".split() ]
+            src, trg, hyp = [Path(join(args.decoding_path, args.id_str, which))
+                             for which in "src trg hyp".split()]
             src.write_text("\n".join(src_corpus), encoding="utf-8")
             trg.write_text("\n".join(trg_corpus), encoding="utf-8")
             hyp.write_text("\n".join(hyp_corpus), encoding="utf-8")
-
     return bleu
 
 
@@ -58,10 +55,10 @@ def train_model(args, model, iterators):
     (train_it, dev_it) = iterators
 
     if not args.debug:
-        decoding_path = Path(args.decoding_path + args.id_str)
+        decoding_path = Path(join(args.decoding_path, args.id_str))
         decoding_path.mkdir(parents=True, exist_ok=True)
         from tensorboardX import SummaryWriter
-        writer = SummaryWriter(join(args.event_path + args.id_str))
+        writer = SummaryWriter(join(args.event_path, args.id_str))
 
     params = [p for p in model.parameters() if p.requires_grad]
     if args.optimizer == 'Adam':
@@ -95,9 +92,11 @@ def train_model(args, model, iterators):
             best.accumulate(dev_bleu[0], iters)
             args.logger.info(best)
 
+            """
             if args.early_stop and (iters - best.iters) // args.eval_every > args.patience:
                 args.logger.info("Early stopping.")
                 break
+            """
 
         model.train()
 
@@ -118,12 +117,13 @@ def train_model(args, model, iterators):
             src_lang, trg_lang = args.pair.split("_")
             src, src_len = train_batch.__dict__[src_lang]
             trg, trg_len = train_batch.__dict__[trg_lang]
+        else:
+            raise ValueError
 
         # NOTE encoder never receives <BOS> token 
         # because during communication, Agent A's decoder will never output <BOS>
         logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
-        nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), size_average=True,
-                              ignore_index=0, reduce=True)
+        nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), reduction='mean')
         num_trg = (trg[:,1:] != 0).sum().item()
         train_metrics.accumulate(num_trg, nll.item())
 
