@@ -23,7 +23,9 @@ def dyn_batch_without_padding(new, i, sofar):
     else:
         raise Exception
 
+
 batch_size_fn = dyn_batch_without_padding
+
 
 def build_dataset(args, dataset):
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
@@ -36,12 +38,11 @@ def build_dataset(args, dataset):
         raise ValueError
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     train_repeat = False if args.setup == "ranker" else True
-
     if dataset == "iwslt":
-        SRC   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                            include_lengths=True, batch_first=True)
-        TRG   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                            include_lengths=True, batch_first=True)
+        SRC = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
+                          include_lengths=True, batch_first=True)
+        TRG = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
+                          include_lengths=True, batch_first=True)
 
         src, trg = ["."+xx for xx in args.pair.split("_")]
         pair = "en-de" if args.pair == "en_de" else "en-fr"
@@ -49,27 +50,25 @@ def build_dataset(args, dataset):
         vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
 
         for (field, vocab) in zip([SRC, TRG], vocabs):
-            import ipdb; ipdb.set_trace()
             field.vocab = TextVocab(itos=torch.load(join(vocab_path, vocab)))
 
         train_path = join(vocab_path, 'iwslt', pair, 'train.' + pair)
-        dev_path = join(vocab_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.{}.bpe'.format(pair))
-        import ipdb; ipdb.set_trace()
+        dev_path = join(vocab_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
         train_data = NormalTranslationDataset(path=train_path,
-            exts=(src, trg), fields=(SRC, TRG),
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset, \
-            training_max_len=args.training_max_len)
+                                              exts=(src, trg), fields=(SRC, TRG),
+                                              load_dataset=args.load_dataset, save_dataset=args.save_dataset,
+                                              training_max_len=args.training_max_len)
 
-        dev_data = NormalTranslationDataset(path=data_prefix + dev,
-            exts=(src, trg), fields=(SRC, TRG),
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+        dev_data = NormalTranslationDataset(path=dev_path,
+                                            exts=(src, trg), fields=(SRC, TRG),
+                                            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        train_it  = data.BucketIterator(train_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True, \
-                                        sort=False, sort_within_batch=True)
-        dev_it    = data.BucketIterator(dev_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False, \
-                                        sort=False, sort_within_batch=True)
+        train_it = data.BucketIterator(train_data, args.batch_size, device=device,
+                                       batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
+                                       sort=False, sort_within_batch=True)
+        dev_it = data.BucketIterator(dev_data, args.batch_size, device=device,
+                                     batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
+                                     sort=False, sort_within_batch=True)
 
         args.__dict__.update({'src':SRC, "trg":TRG, 'voc_sz_src':len(SRC.vocab), 'voc_sz_trg':len(TRG.vocab)})
 
@@ -165,9 +164,6 @@ def build_dataset(args, dataset):
                                         bptt_len=args.seq_len)
 
         args.__dict__.update({"EN":EN})
-
-    print ("Train : {}".format(data_prefix + train))
-    print ("Dev : {}".format(data_prefix + dev))
 
     args.__dict__.update({'pad_token': 0, \
                           'unk_token': 1, \
@@ -389,21 +385,21 @@ class NormalTranslationDataset(TranslationDataset):
         dataset_path = path + exts[0] + exts[1] + '.processed.pt'
         if load_dataset and (os.path.exists(dataset_path)):
             examples = pickle.load(open(dataset_path, "rb"))
-            print ("Loaded TorchText dataset")
+            print("Loaded TorchText dataset")
         else:
+            print('Loading from {} and {}'.format(src_path, trg_path))
             examples = []
             with open(src_path) as src_file, open(trg_path) as trg_file:
                 for src_line, trg_line in zip(src_file, trg_file):
                     src_line, trg_line = src_line.strip(), trg_line.strip()
                     if src_line != '' and trg_line != '':
-                        if training_max_len is None or ( \
-                            (len(src_line.split()) <= training_max_len) \
-                            and (len(trg_line.split()) <= training_max_len) ):
+                        if training_max_len is None or ((len(src_line.split()) <= training_max_len)
+                                                        and (len(trg_line.split()) <= training_max_len)):
                             examples.append(data.Example.fromlist(
                                 [src_line, trg_line], fields))
             if save_dataset:
                 pickle.dump(examples, open(dataset_path, "wb"))
-                print ("Saved TorchText dataset")
+                print("Saved TorchText dataset")
 
         super(TranslationDataset, self).__init__(examples, fields, **kwargs)
 
