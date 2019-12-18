@@ -15,7 +15,7 @@ import time
 import os
 from pathlib import Path
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, data_path, \
+from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, \
         build_dataset, TextVocab, Multi30kIterator
 from utils import which_machine, set_seed, cuda, get_logger
 from agents import Agents

@@ -211,3 +211,16 @@ def apply_bpe_multi30k():
 apply_bpe_multi30k()
 apply_bpe_iwslt(FR, EN)
 apply_bpe_iwslt(EN, DE)
+
+
+"""
+Converting vocab to itos
+"""
+import torch
+for lang in [FR, EN, DE]:
+    itos = []
+    with open(join(ROOT_BPE_DIR, 'vocab' + lang)) as f:
+        line = f.readline()
+        word = line.split(' ')[0]
+        itos.append(word)
+    torch.save(itos, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))

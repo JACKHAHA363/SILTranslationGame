@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, data_path
+from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
 from utils import write_tb
 from metrics import Metrics, Best
 from misc.bleu import computeBLEU, compute_bp, print_bleu

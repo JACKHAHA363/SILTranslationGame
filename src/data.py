@@ -1,15 +1,10 @@
 import io
 import six
-import math
-import ipdb
 import torch
-import random
-import numpy as np
 import _pickle as pickle
 import revtok
 import os
-from itertools import groupby
-import getpass
+from os.path import abspath, dirname, join
 
 from torchtext import data, datasets, vocab
 from torchtext.data import Dataset
@@ -31,20 +26,15 @@ def dyn_batch_without_padding(new, i, sofar):
 batch_size_fn = dyn_batch_without_padding
 
 def build_dataset(args, dataset):
-    import ipdb;
-    ipdb.set_trace()
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
 
     # Determine corpora path
     machine = which_machine()
     if machine == 'mila':
-        corpora_path = '/network/data1/luyuchen/translation_game'
+        vocab_path = join(dirname(dirname(dirname(abspath(__file__)))), 'data/bpe')
     else:
         raise ValueError
-    bpe_dir = os.path.join(corpora_path, 'bpe')
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
-    #vocab_path = "/private/home/jasonleeinf/corpora/groundcomms_data/word_level/"
-    #en_vocab, de_vocab, fr_vocab = "en_10050.vocab", "de_10141.vocab", "fr_10165.vocab"
     train_repeat = False if args.setup == "ranker" else True
 
     if dataset == "iwslt":
@@ -60,12 +50,12 @@ def build_dataset(args, dataset):
 
         for (field, vocab) in zip([SRC, TRG], vocabs):
             import ipdb; ipdb.set_trace()
-            field.vocab = TextVocab(itos=torch.load(vocab_path + vocab))
+            field.vocab = TextVocab(itos=torch.load(join(vocab_path, vocab)))
 
-        train = "train.{}.bpe".format(pair)
-        dev = "IWSLT16.TED.tst2013.{}.bpe".format(pair)
-
-        train_data = NormalTranslationDataset(path=data_prefix + train,
+        train_path = join(vocab_path, 'iwslt', pair, 'train.' + pair)
+        dev_path = join(vocab_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.{}.bpe'.format(pair))
+        import ipdb; ipdb.set_trace()
+        train_data = NormalTranslationDataset(path=train_path,
             exts=(src, trg), fields=(SRC, TRG),
             load_dataset=args.load_dataset, save_dataset=args.save_dataset, \
             training_max_len=args.training_max_len)
@@ -190,6 +180,7 @@ def build_dataset(args, dataset):
 def _default_unk_index():
     return 1
 
+"""
 def data_path(dataset, args):
 
     if dataset == "multi30k":
@@ -214,6 +205,7 @@ def data_path(dataset, args):
         return "/private/home/jasonleeinf/corpora/{}/".format(path)
     else:
         return
+"""
 
 class TextVocab(vocab.Vocab):
     def __init__(self, counter=None, max_size=None, min_freq=1, specials=['<pad>'],

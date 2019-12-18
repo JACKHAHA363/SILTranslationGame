@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, data_path
+from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
 from utils import token_analysis, get_counts, write_tb, plot_grad, cuda, normf
 from metrics import Metrics, Best
 
