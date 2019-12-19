@@ -22,21 +22,28 @@ class Params():
             params = json.load(f)
             self.__dict__.update(params)
 
-    def update_argv(self, argv):
+    def update(self, parsed_args):
+        assert isinstance(parsed_args, dict)
+        self.__dict__.update(parsed_args)
+
+    @classmethod
+    def parse_cmd(cls, argv):
+        res = {}
         ignore_args = []
         idx = 1
         while idx < len(argv):
             cur = argv[idx].strip()
-            if cur.startswith("--") and idx+1 < len(argv):
-               nxt = argv[idx+1].strip()
-               if nxt.startswith("--") or cur in ignore_args:
-                   print ("IGNORED : {}".format(cur))
-                   pass
-               self.__dict__[cur.replace("--","")] = parse(nxt)
-               idx += 1
+            if cur.startswith("--") and idx + 1 < len(argv):
+                nxt = argv[idx + 1].strip()
+                if nxt.startswith("--") or cur in ignore_args:
+                    print("IGNORED : {}".format(cur))
+                    pass
+                res[cur.replace("--", "")] = parse(nxt)
+                idx += 1
             else:
-                print ("IGNORED : {}".format(cur))
+                print("IGNORED : {}".format(cur))
             idx += 1
+        return res, ignore_args
 
     def __str__(self):
         return ( ', '.join("{}: {}".format(k,v) for k, v in self.__dict__.items()) )

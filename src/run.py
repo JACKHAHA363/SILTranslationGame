@@ -2,14 +2,13 @@ import sys
 import torch
 import numpy as np
 
-from time import gmtime, strftime, localtime
+from time import strftime, localtime
 from os.path import join
 import os
 from pathlib import Path
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, \
-        build_dataset, TextVocab, Multi30kIterator
-from utils import which_machine, set_seed, cuda, get_logger
+from data import build_dataset
+from utils import set_seed, get_logger
 from agents import Agents
 from agent import RNNAttn, ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params, get_hp_str
@@ -17,18 +16,17 @@ from hyperparams import Params, get_hp_str
 home_path = os.path.dirname(os.path.abspath(__file__))
 main_path = os.path.dirname(home_path)
 
-if "single" in sys.argv:
-    args = Params(os.path.join(home_path, "hyperparams_single.json"))
-elif "joint" in sys.argv:
-    args = Params(os.path.join(home_path, "hyperparams_joint.json"))
-elif "ranker" in sys.argv:
-    args = Params(os.path.join(home_path, "hyperparams_ranker.json"))
-elif "lm" in sys.argv:
-    args = Params(os.path.join(home_path, "hyperparams_lm.json"))
-else:
-    raise ValueError
+# Parse from cmd to get JSON
+parsed_args, _ = Params.parse_cmd(sys.argv)
 
-args.update_argv(sys.argv)
+if 'config' in parsed_args:
+    print('Find json_config')
+    args = Params(parsed_args['config'])
+else:
+    raise ValueError('You must pass in an json config!')
+
+# Update some of them with command line
+args.update(parsed_args)
 
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single', 'joint']:
