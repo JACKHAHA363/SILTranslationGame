@@ -45,7 +45,7 @@ def build_dataset(args, dataset):
                           include_lengths=True, batch_first=True)
 
         src, trg = ["."+xx for xx in args.pair.split("_")]
-        pair = "en-de" if args.pair == "en_de" else "en-fr"
+        pair = args.pair.replace('_', '-')
 
         vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
 

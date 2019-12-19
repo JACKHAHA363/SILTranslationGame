@@ -23,10 +23,16 @@ if 'config' in parsed_args:
     print('Find json_config')
     args = Params(parsed_args['config'])
 else:
-    raise ValueError('You must pass in an json config!')
+    raise ValueError('You must pass in --config!')
+
+if 'exp_dir' in parsed_args:
+    print('exp_dir', parsed_args['exp_dir'])
+else:
+    raise ValueError('You must pass in the --exp_dir')
 
 # Update some of them with command line
 args.update(parsed_args)
+args.exp_dir = os.path.abspath(args.exp_dir)
 
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single', 'joint']:
@@ -36,7 +42,7 @@ if args.mode == "train":
     for name in folders:
         folder = "{}/{}_{}/".format(name, args.date, args.experiment) \
                 if hasattr(args, "date") and hasattr(args, "experiment") else name + '/'
-        args.__dict__["{}_path".format(name)] = os.path.join(main_path, folder)
+        args.__dict__["{}_path".format(name)] = os.path.join(args.exp_dir, folder)
         if not args.debug:
             Path(args.__dict__["{}_path".format(name)]).mkdir(parents=True, exist_ok=True)
 
@@ -59,13 +65,13 @@ if args.mode == "test" and hasattr(args, "experiment") and hasattr(args, "id_str
     args.mode = "test"
     args.debug = True
     args.dataset = dataset
-    logger.info( "Hyperparameters loaded." )
+    logger.info("Hyperparameters loaded.")
     args.batch_size = 400
 
 set_seed(args)
 
 if args.mode == "train" and not args.debug:
-    args.save( (str(args.param_path + args.id_str)) )
+    args.save((str(args.param_path + args.id_str)))
 
 if args.setup == "ranker":
     train_it, dev_it = {}, {}
