@@ -27,10 +27,14 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
                 src_lang, trg_lang = args.pair.split("_")
                 src, src_len = dev_batch.__dict__[src_lang]
                 trg, trg_len = dev_batch.__dict__[trg_lang]
+            batch_size = len(src)
             logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
-            nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1),
-                                  ignore_index=0, reduction='mean')
-            num_trg = (trg[:,1:] != 0).sum().item()
+            trg_masks = xlen_to_inv_mask(trg_len)
+            trg_masks = trg_masks[:, 1:]
+            nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='none').view(batch_size, -1)
+            nll.masked_fill_(trg_masks.bool(), 0.)
+            nll = (nll.sum(dim=1) / (trg_len - 1)).mean()
+            num_trg = (trg_len - 1).sum().item()
             dev_metrics.accumulate(num_trg, nll.item())
             hyp = model.decode(src, src_len, decode_method, beam_width)
             src_corpus.extend(args.src.reverse(src))
