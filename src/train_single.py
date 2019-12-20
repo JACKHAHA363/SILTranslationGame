@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import write_tb
+from utils import write_tb, xlen_to_inv_mask
 from metrics import Metrics, Best
 from misc.bleu import computeBLEU, compute_bp, print_bleu
 from pathlib import Path
@@ -123,8 +123,12 @@ def train_model(args, model, iterators):
         # NOTE encoder never receives <BOS> token 
         # because during communication, Agent A's decoder will never output <BOS>
         logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
-        nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), reduction='mean')
-        num_trg = (trg[:,1:] != 0).sum().item()
+        trg_masks = xlen_to_inv_mask(trg_len)
+        trg_masks = trg_masks[:, 1:]
+        nll = F.cross_entropy(logits, trg[:,1:].contiguous().view(-1), reduction='none').view(batch_size, -1)
+        nll.masked_fill_(trg_masks.bool(), 0.)
+        nll = (nll.sum(dim=1) / (trg_len - 1)).mean()
+        num_trg = (trg_len - 1).sum().item()
         train_metrics.accumulate(num_trg, nll.item())
 
         if args.grad_clip > 0:
