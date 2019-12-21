@@ -74,46 +74,43 @@ def build_dataset(args, dataset):
                               'voc_sz_trg': len(TRG.vocab)})
 
     elif dataset == "multi30k":
-        FR   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                           include_lengths=True, batch_first=True)
-        EN   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                           include_lengths=True, batch_first=True)
-        DE   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                           include_lengths=True, batch_first=True)
+        FR = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+                         include_lengths=True, batch_first=True)
+        EN = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+                         include_lengths=True, batch_first=True)
+        DE = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+                         include_lengths=True, batch_first=True)
 
         vocabs = [fr_vocab, en_vocab, de_vocab]
         fields = [FR, EN, DE]
         exts = ['.fr', '.en', '.de']
 
         for (field, vocab) in zip(fields, vocabs):
-            field.vocab = TextVocab(itos=torch.load(vocab_path + vocab))
+            field.vocab = TextVocab(counter=torch.load(join(vocab_path, vocab)))
 
-        train = "train.bpe"
-        dev = "val.bpe"
+        train_data = TripleTranslationDataset(path=os.path.join(vocab_path, 'multi30k', 'train'),
+                                              exts=exts, fields=fields,
+                                              load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        train_data = TripleTranslationDataset(path=data_prefix + train,
-            exts=exts, fields=fields,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+        dev_data = TripleTranslationDataset(path=os.path.join(vocab_path, 'multi30k', 'val'),
+                                            exts=exts, fields=fields,
+                                            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        dev_data = TripleTranslationDataset(path=data_prefix + dev,
-            exts=exts, fields=fields,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
-
-        train_it  = Multi30kIterator(train_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True, \
-                                        sort=False, sort_within_batch=True)
-        dev_it    = Multi30kIterator(dev_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False, \
-                                        sort=False, sort_within_batch=True)
+        train_it = Multi30kIterator(train_data, args.batch_size, device=device,
+                                    batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
+                                    sort=False, sort_within_batch=True)
+        dev_it = Multi30kIterator(dev_data, args.batch_size, device=device,
+                                  batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
+                                  sort=False, sort_within_batch=True)
 
         if args.setup == "single":
-            langs = {"en":EN, "de":DE, "fr":FR}
+            langs = {"en": EN, "de": DE, "fr": FR}
             src, trg = args.pair.split("_")
             src, trg = langs[src], langs[trg]
-            args.__dict__.update({'voc_sz_src':len(src.vocab), 'voc_sz_trg':len(trg.vocab)})
-            args.__dict__.update({'src':src, 'trg':trg})
+            args.__dict__.update({'voc_sz_src': len(src.vocab), 'voc_sz_trg': len(trg.vocab)})
+            args.__dict__.update({'src': src, 'trg': trg})
         else:
-            args.__dict__.update({'FR':FR, "DE":DE, "EN":EN})
+            args.__dict__.update({'FR': FR, "DE": DE, "EN": EN})
 
     elif dataset == "coco":
         EN   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
