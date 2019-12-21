@@ -14,7 +14,7 @@ ROOT_BPE_DIR = './data/bpe'
 FR = '.fr'
 EN = '.en'
 DE = '.de'
-MIN_FREQ = 1
+MIN_FREQ = 10
 
 LOGGER = logging.getLogger()
 
@@ -160,6 +160,7 @@ def learn_bpe():
         learn_bpe_cmd += ['-s', '25000']
         learn_bpe_cmd += ['-o', join(ROOT_BPE_DIR, 'bpe.codes')]
         learn_bpe_cmd += ['--write-vocabulary'] + [join(ROOT_BPE_DIR, 'vocab' + lang) for lang in lang_files]
+        learn_bpe_cmd += ['--min-frequency', str(MIN_FREQ)]
         LOGGER.info('Learning BPE on joint language...')
         LOGGER.info(' '.join(learn_bpe_cmd))
         call(learn_bpe_cmd)
@@ -183,7 +184,6 @@ def _apply_bpe(in_file, out_file, lang):
     cmd = ['subword-nmt', 'apply-bpe']
     cmd += ['-c', codes_file]
     cmd += ['--vocabulary', vocab_file]
-    cmd += ['--vocabulary-threshold', str(MIN_FREQ)]
     cmd += ['--input', in_file]
     cmd += ['--output', out_file]
     LOGGER.info('Applying BPE to {}'.format(basename(out_file)))
