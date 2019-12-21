@@ -8,3 +8,5 @@ log
 model
 param
 zzz*
+data
+subword_nmt

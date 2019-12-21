@@ -1,3 +1,4 @@
+""" Our preprocess """
 import os
 from itertools import product
 from os.path import join, basename
@@ -7,15 +8,17 @@ from tqdm import tqdm
 import logging
 from mosestokenizer import MosesTokenizer
 
-ROOT_CORPUS_DIR = './corpus/'
-ROOT_TOK_DIR = './tok'
-ROOT_BPE_DIR = './bpe'
+ROOT_CORPUS_DIR = './data/corpus/'
+ROOT_TOK_DIR = './data/tok'
+ROOT_BPE_DIR = './data/bpe'
 FR = '.fr'
 EN = '.en'
 DE = '.de'
 MIN_FREQ = 1
 
 LOGGER = logging.getLogger()
+
+
 def config_logger():
     """ Config the logger """
     log_format = logging.Formatter("[%(asctime)s %(levelname)s] %(message)s")
@@ -23,11 +26,15 @@ def config_logger():
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_format)
     LOGGER.handlers = [console_handler]
+
+
 config_logger()
 
 """
 Download
 """
+
+
 def _IWSLT_download_helper(src_lang, tgt_lang):
     """ Download result given source and target language """
     corpus_dir = join(ROOT_CORPUS_DIR, IWSLT.name, IWSLT.base_dirname.format(src_lang[1:], tgt_lang[1:]))
@@ -40,8 +47,10 @@ def _IWSLT_download_helper(src_lang, tgt_lang):
     IWSLT.download(root=ROOT_CORPUS_DIR, check=corpus_dir)
     IWSLT.clean(corpus_dir)
 
+
 _IWSLT_download_helper(FR, EN)
 _IWSLT_download_helper(EN, DE)
+
 
 def _download_multi30k():
     """ Get the corpus of multi30k task1 """
@@ -58,21 +67,22 @@ def _download_multi30k():
         call(wget_cmd)
         call(['gunzip', '-k', join(corpus_dir, '{}{}.gz'.format(prefix, lang))])
 
-_download_multi30k()
 
+_download_multi30k()
 
 """
 Tokenize
 """
 TOKENIZORS = {EN: MosesTokenizer('en'), FR: MosesTokenizer('fr'), DE: MosesTokenizer('de')}
 
+
 def _tokenize(in_file, out_file, tokenizor):
-	with open(out_file, 'w') as out, open(in_file, 'r') as inp:
-		LOGGER.info('tokenizing {}...'.format(basename(in_file)))
-		lines = inp.readlines()
-		for line in tqdm(lines):
-			tokenized_line = tokenizor(line.lower())
-			out.write(' '.join(tokenized_line + ['\n']))
+    with open(out_file, 'w') as out, open(in_file, 'r') as inp:
+        LOGGER.info('tokenizing {}...'.format(basename(in_file)))
+        lines = inp.readlines()
+        for line in tqdm(lines):
+            tokenized_line = tokenizor(line.lower())
+            out.write(' '.join(tokenized_line + ['\n']))
 
 
 def _tokenize_IWSLT_helper(src_lang, tgt_lang):
@@ -96,8 +106,10 @@ def _tokenize_IWSLT_helper(src_lang, tgt_lang):
         out_file = join(token_dir, prefix + '.' + suffix)
         _tokenize(in_file=in_file, out_file=out_file, tokenizor=TOKENIZORS[lang])
 
+
 _tokenize_IWSLT_helper(FR, EN)
 _tokenize_IWSLT_helper(EN, DE)
+
 
 def _tokenize_multi30k():
     # tokenize
@@ -116,12 +128,14 @@ def _tokenize_multi30k():
         out_file = join(tok_dir, file_name)
         _tokenize(in_file, out_file, TOKENIZORS[lang])
 
-_tokenize_multi30k()
 
+_tokenize_multi30k()
 
 """
 LEARN BPE and apply it to corpus
 """
+
+
 def learn_bpe():
     """ Learn the BPE and get vocab """
     if not os.path.exists(ROOT_BPE_DIR):
@@ -143,14 +157,14 @@ def learn_bpe():
     if not os.path.exists(join(ROOT_BPE_DIR, 'bpe.codes')):
         learn_bpe_cmd = ['subword-nmt', 'learn-joint-bpe-and-vocab']
         learn_bpe_cmd += ['--input'] + [join(ROOT_BPE_DIR, 'corpus' + lang) for lang in lang_files]
-        learn_bpe_cmd += ['-s', '10000']
+        learn_bpe_cmd += ['-s', '25000']
         learn_bpe_cmd += ['-o', join(ROOT_BPE_DIR, 'bpe.codes')]
         learn_bpe_cmd += ['--write-vocabulary'] + [join(ROOT_BPE_DIR, 'vocab' + lang) for lang in lang_files]
         LOGGER.info('Learning BPE on joint language...')
+        LOGGER.info(' '.join(learn_bpe_cmd))
         call(learn_bpe_cmd)
     else:
         LOGGER.info('bpe.codes file exist, skipping...')
-
 
     # Remove appended corpus
     LOGGER.info('Remove appending corpus...')
@@ -173,7 +187,9 @@ def _apply_bpe(in_file, out_file, lang):
     cmd += ['--input', in_file]
     cmd += ['--output', out_file]
     LOGGER.info('Applying BPE to {}'.format(basename(out_file)))
+    LOGGER.info(' '.join(cmd))
     call(cmd)
+
 
 def apply_bpe_iwslt(src_lang, tgt_lang):
     """ Apply BPE to iwslt with `src_lang` and `tgt_lang` """
@@ -208,16 +224,17 @@ def apply_bpe_multi30k():
         out_file = join(bpe_dir, file_name)
         _apply_bpe(in_file, out_file, lang=lang)
 
+
 apply_bpe_multi30k()
 apply_bpe_iwslt(FR, EN)
 apply_bpe_iwslt(EN, DE)
-
 
 """
 Converting vocab to itos
 """
 import torch
 from collections import Counter
+
 for lang in [FR, EN, DE]:
     counter = Counter()
     with open(join(ROOT_BPE_DIR, 'vocab' + lang)) as f:
