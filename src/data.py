@@ -203,8 +203,7 @@ def data_path(dataset, args):
 class TextVocab(vocab.Vocab):
     def __init__(self, counter):
         super(TextVocab, self).__init__(counter=counter,
-                                        specials=['<BOS>', '<UNK>',
-                                                  '<EOS>', '<PAD>'],
+                                        specials=['<PAD>', '<BOS>', '<UNK>', '<EOS>'],
                                         specials_first=True)
 
 
