@@ -33,7 +33,7 @@ def build_dataset(args, dataset):
     # Determine corpora path
     machine = which_machine()
     if machine == 'mila':
-        vocab_path = join(dirname(dirname(dirname(abspath(__file__)))), 'data/bpe')
+        vocab_path = join(dirname(dirname(abspath(__file__))), 'data/bpe')
     else:
         raise ValueError
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
