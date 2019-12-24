@@ -6,7 +6,6 @@ from subprocess import call
 from torchtext.datasets import IWSLT
 from tqdm import tqdm
 import logging
-from mosestokenizer import MosesTokenizer
 
 ROOT_CORPUS_DIR = './data/corpus/'
 ROOT_TOK_DIR = './data/tok'
@@ -73,10 +72,11 @@ _download_multi30k()
 """
 Tokenize
 """
-TOKENIZORS = {EN: MosesTokenizer('en'), FR: MosesTokenizer('fr'), DE: MosesTokenizer('de')}
-
+MOSES_PATH = os.path.join(os.path.dirname(__file__), 'moses')
 
 def _tokenize(in_file, out_file, tokenizor):
+    cmd = ['cat', in_file, '|']
+    cmd = []
     with open(out_file, 'w') as out, open(in_file, 'r') as inp:
         LOGGER.info('tokenizing {}...'.format(basename(in_file)))
         lines = inp.readlines()
@@ -114,7 +114,7 @@ _tokenize_IWSLT_helper(EN, DE)
 def _tokenize_multi30k():
     # tokenize
     corpus_dir = join(ROOT_CORPUS_DIR, 'multi30k')
-    prefixs = ['train', 'val']
+    prefixs = ['train', 'val', 'test_2017_flickr']
     langs = [FR, EN, DE]
     tok_dir = join(ROOT_TOK_DIR, 'multi30k')
     if os.path.exists(tok_dir):
