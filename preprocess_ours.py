@@ -72,17 +72,18 @@ _download_multi30k()
 """
 Tokenize
 """
-MOSES_PATH = os.path.join(os.path.dirname(__file__), 'moses')
+MOSES_PATH = os.path.join(os.path.dirname(__file__), 'moses/tokenizer')
 
-def _tokenize(in_file, out_file, tokenizor):
+
+def _tokenize(in_file, out_file, lang):
     cmd = ['cat', in_file, '|']
-    cmd = []
-    with open(out_file, 'w') as out, open(in_file, 'r') as inp:
-        LOGGER.info('tokenizing {}...'.format(basename(in_file)))
-        lines = inp.readlines()
-        for line in tqdm(lines):
-            tokenized_line = tokenizor(line.lower())
-            out.write(' '.join(tokenized_line + ['\n']))
+    cmd += [os.path.join(MOSES_PATH, 'lowercase.perl'), '|']
+    cmd += [os.path.join(MOSES_PATH, 'normalize-punctuation.perl'), '-l', lang[1:], '|']
+    cmd += [os.path.join(MOSES_PATH, 'tokenizer.perl'), '-l', lang[1:], '-threads', '4']
+    cmd += ['>', out_file]
+    cmd = ' '.join(cmd)
+    LOGGER.info(cmd)
+    os.system(cmd)
 
 
 def _tokenize_IWSLT_helper(src_lang, tgt_lang):
@@ -104,7 +105,7 @@ def _tokenize_IWSLT_helper(src_lang, tgt_lang):
     for prefix, (suffix, lang) in product(prefixs, suffix_langs):
         in_file = join(corpus_dir, prefix + '.' + suffix)
         out_file = join(token_dir, prefix + '.' + suffix)
-        _tokenize(in_file=in_file, out_file=out_file, tokenizor=TOKENIZORS[lang])
+        _tokenize(in_file=in_file, out_file=out_file, lang=lang)
 
 
 _tokenize_IWSLT_helper(FR, EN)
@@ -126,7 +127,7 @@ def _tokenize_multi30k():
         file_name = '{}{}'.format(prefix, lang)
         in_file = join(corpus_dir, file_name)
         out_file = join(tok_dir, file_name)
-        _tokenize(in_file, out_file, TOKENIZORS[lang])
+        _tokenize(in_file, out_file, lang)
 
 
 _tokenize_multi30k()
@@ -135,6 +136,9 @@ _tokenize_multi30k()
 LEARN BPE and apply it to corpus
 """
 
+SUBWORD = join(os.path.dirname(__file__), 'subword-nmt')
+LEARN_BPE = join(SUBWORD, 'learn_bpe.py')
+APPLY_BPE = join(SUBWORD, 'apply_bpe.py')
 
 def learn_bpe():
     """ Learn the BPE and get vocab """
@@ -147,7 +151,7 @@ def learn_bpe():
         cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')]
         cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]
         cmd += ['|']
-        cmd += ['subword-nmt', 'learn-bpe', '-s', '25000']
+        cmd += [LEARN_BPE, '-s', '25000']
         cmd += ['>', join(ROOT_BPE_DIR, 'bpe.codes')]
         cmd = ' '.join(cmd)
         LOGGER.info(cmd)
@@ -163,8 +167,7 @@ def _apply_bpe(in_file, out_file):
     """ Apply BPE """
     codes_file = join(ROOT_BPE_DIR, 'bpe.codes')
     assert os.path.exists(codes_file), '{} not exists!'.format(codes_file)
-    cmd = ['subword-nmt', 'apply-bpe']
-    cmd += ['-c', codes_file]
+    cmd = [APPLY_BPE, '-c', codes_file]
     cmd += ['--input', in_file]
     cmd += ['--output', out_file]
     LOGGER.info('Applying BPE to {}'.format(basename(out_file)))
@@ -215,10 +218,6 @@ Converting vocab to itos
 """
 import torch
 from collections import Counter
-
-lang_files = {EN: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.en"')],
-              FR: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')],
-              DE: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]}
 
 for lang in [FR, EN, DE]:
     counter = Counter()
