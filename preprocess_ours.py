@@ -140,50 +140,31 @@ def learn_bpe():
     """ Learn the BPE and get vocab """
     if not os.path.exists(ROOT_BPE_DIR):
         os.makedirs(ROOT_BPE_DIR)
-    lang_files = {EN: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.en"')],
-                  FR: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')],
-                  DE: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]}
 
-    # Append together
-    LOGGER.info('Appending Corpus together...')
-    for lang in lang_files:
-        with open(join(ROOT_BPE_DIR, 'corpus' + lang), 'w') as outfile:
-            for fname in lang_files[lang]:
-                with open(fname) as infile:
-                    for line in infile:
-                        outfile.write(line)
-
-    # BPE and Get Vocab
     if not os.path.exists(join(ROOT_BPE_DIR, 'bpe.codes')):
-        learn_bpe_cmd = ['subword-nmt', 'learn-joint-bpe-and-vocab']
-        learn_bpe_cmd += ['--input'] + [join(ROOT_BPE_DIR, 'corpus' + lang) for lang in lang_files]
-        learn_bpe_cmd += ['-s', '25000']
-        learn_bpe_cmd += ['-o', join(ROOT_BPE_DIR, 'bpe.codes')]
-        learn_bpe_cmd += ['--write-vocabulary'] + [join(ROOT_BPE_DIR, 'vocab' + lang) for lang in lang_files]
-        learn_bpe_cmd += ['--min-frequency', str(MIN_FREQ)]
-        LOGGER.info('Learning BPE on joint language...')
-        LOGGER.info(' '.join(learn_bpe_cmd))
-        call(learn_bpe_cmd)
+        cmd = ['cat']
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.en"')]
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')]
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]
+        cmd += ['|']
+        cmd += ['subword-nmt', 'learn-bpe', '-s', '25000']
+        cmd += ['>', join(ROOT_BPE_DIR, 'bpe.codes')]
+        cmd = ' '.join(cmd)
+        LOGGER.info(cmd)
+        os.system(cmd)
     else:
         LOGGER.info('bpe.codes file exist, skipping...')
-
-    # Remove appended corpus
-    LOGGER.info('Remove appending corpus...')
-    for lang in lang_files:
-        os.remove(join(ROOT_BPE_DIR, 'corpus' + lang))
 
 
 learn_bpe()
 
 
-def _apply_bpe(in_file, out_file, lang):
+def _apply_bpe(in_file, out_file):
     """ Apply BPE """
     codes_file = join(ROOT_BPE_DIR, 'bpe.codes')
     assert os.path.exists(codes_file), '{} not exists!'.format(codes_file)
-    vocab_file = join(ROOT_BPE_DIR, 'vocab' + lang)
     cmd = ['subword-nmt', 'apply-bpe']
     cmd += ['-c', codes_file]
-    cmd += ['--vocabulary', vocab_file]
     cmd += ['--input', in_file]
     cmd += ['--output', out_file]
     LOGGER.info('Applying BPE to {}'.format(basename(out_file)))
@@ -205,7 +186,7 @@ def apply_bpe_iwslt(src_lang, tgt_lang):
     for prefix, suffix in product(prefixs, suffixs):
         tokenized_file = join(tok_dir, prefix + '.' + suffix)
         bpe_out = join(bpe_dir, prefix + '.' + suffix)
-        _apply_bpe(in_file=tokenized_file, out_file=bpe_out, lang=suffix[-3:])
+        _apply_bpe(in_file=tokenized_file, out_file=bpe_out)
 
 
 def apply_bpe_multi30k():
@@ -222,7 +203,7 @@ def apply_bpe_multi30k():
         file_name = prefix + lang
         in_file = join(tok_dir, file_name)
         out_file = join(bpe_dir, file_name)
-        _apply_bpe(in_file, out_file, lang=lang)
+        _apply_bpe(in_file, out_file)
 
 
 apply_bpe_multi30k()
@@ -235,10 +216,17 @@ Converting vocab to itos
 import torch
 from collections import Counter
 
+lang_files = {EN: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.en"')],
+              FR: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')],
+              DE: [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]}
+
 for lang in [FR, EN, DE]:
     counter = Counter()
-    with open(join(ROOT_BPE_DIR, 'vocab' + lang)) as f:
-        for line in f:
-            word, freq = line.rstrip('\n').split(' ')
-            counter[word] = int(freq)
+    for fpath in os.popen('find ' + ROOT_BPE_DIR + ' -regex ".*\{}"'.format(lang)):
+        fpath = fpath.rstrip('\n')
+        with open(fpath) as f:
+            for line in f:
+                for word in line.rstrip('\n').split():
+                    counter[word] += 1
+    LOGGER.info('{} vocab size: {}'.format(lang, len(counter)))
     torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
