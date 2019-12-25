@@ -28,7 +28,7 @@ def valid_model(args, model, dev_it, dev_metrics, loss_names, monitor_names, ite
 
             R = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1], ranker=extra_input["ranker"])
             losses = [ R[key] for key in loss_names ]
-            dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses], *[R[k] for k in monitor_names])
+            dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
 
             en_msg, de_msg = model.decode(dev_batch)
             en_hyp.extend( args.EN.reverse(en_msg, unbpe=unbpe) )
@@ -142,7 +142,7 @@ def train_model(args, model, iterators, extra_input):
         for loss_name, loss in zip(loss_names, losses):
             total_loss += loss * loss_cos[loss_name]
 
-        train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k] for k in monitor_names])
+        train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
 
         total_loss.backward()
         if args.plot_grad:
