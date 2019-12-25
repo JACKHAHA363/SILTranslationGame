@@ -220,7 +220,7 @@ class RNNDecAttn(ArgsModule):
             msg.scatter_(dim=1, index=seq_lens[:,None], src=eos_or_pad[:,None])
             seq_lens = seq_lens + (1-ends_with_eos)
             msg_mask = xlen_to_inv_mask(seq_lens, seq_len=msg.size(1)) # (batch_size, x_seq_len)
-            msg.masked_fill_(msg_mask, self.eos_token)
+            msg.masked_fill_(msg_mask.bool(), self.pad_token)
             result.update({"msg":msg, "new_seq_lens":seq_lens})
 
         return result
