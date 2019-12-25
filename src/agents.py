@@ -105,13 +105,13 @@ class Agents(ArgsModule):
             R_b = self.fr_en.dec.R_b # (batch_size, en_msg_len)
             en_mask = xlen_to_inv_mask(en_msg_len, R_b.size(1))
             b_loss = ((R[:,None] - R_b) ** 2) # (batch_size, en_msg_len)
-            b_loss.masked_fill_(en_mask, 0) # (batch_size, en_msg_len)
+            b_loss.masked_fill_(en_mask.bool(), 0) # (batch_size, en_msg_len)
             b_loss = b_loss.sum(dim=1) / (en_msg_len).float() # (batch_size)
             b_loss = b_loss.mean() # (1,)
 
             pg_loss = -1 * self.fr_en.dec.log_probs # (batch_size, en_msg_len)
             pg_loss = (R[:,None] - R_b).detach() * pg_loss # (batch_size, en_msg_len)
-            pg_loss.masked_fill_(en_mask, 0) # (batch_size, en_msg_len)
+            pg_loss.masked_fill_(en_mask.bool(), 0) # (batch_size, en_msg_len)
             pg_loss = pg_loss.sum(dim=1) / (en_msg_len).float() # (batch_size)
             pg_loss = pg_loss.mean() # (1,)
 

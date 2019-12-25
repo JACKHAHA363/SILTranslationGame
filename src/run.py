@@ -14,7 +14,6 @@ from agent import RNNAttn, ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params, get_hp_str
 
 home_path = os.path.dirname(os.path.abspath(__file__))
-main_path = os.path.dirname(home_path)
 
 # Parse from cmd to get JSON
 parsed_args, _ = Params.parse_cmd(sys.argv)
@@ -33,6 +32,7 @@ else:
 # Update some of them with command line
 args.update(parsed_args)
 args.exp_dir = os.path.abspath(args.exp_dir)
+main_path = args.exp_dir
 
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single', 'joint']:
@@ -162,11 +162,11 @@ if args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) :
 # Loading checkpoints pretrained on IWSLT
 if args.setup == "joint":
     if args.model == "RNNAttn":
-        en_de = ("180816_04_en_de", "08.17_01.38._single_rnnattn_en_de_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.3_clip0.1_")
-        fr_en = ("180817_01_fr_en", "08.17_21.52._single_rnnattn_fr_en_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip0.1_")
-    elif args.model == "RNN":
-        en_de = ("180906_02_en_de_noattn_big", "09.06_01.30._single_rnn_en_de_emb512_hid512_1l_lr1e-04_linear_ann1500k_drop0.5_clip1.0_")
-        fr_en = ("180906_03_fr_en_noattn_big", "09.06_01.33._single_rnn_fr_en_emb512_hid512_1l_lr3e-04_linear_ann1000k_drop0.6_clip1.0_")
+        en_de = ("20181223_data_correct_token", "12.24_02.30._single_rnnattn_en_de_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip1.0_")
+        fr_en = ("20181223_data_correct_token", "12.24_02.29._single_rnnattn_fr_en_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip1.0_")
+    #elif args.model == "RNN":
+    #    en_de = ("180906_02_en_de_noattn_big", "09.06_01.30._single_rnn_en_de_emb512_hid512_1l_lr1e-04_linear_ann1500k_drop0.5_clip1.0_")
+    #    fr_en = ("180906_03_fr_en_noattn_big", "09.06_01.33._single_rnn_fr_en_emb512_hid512_1l_lr3e-04_linear_ann1000k_drop0.6_clip1.0_")
     load_from_en_de = "{}/model/{}/{}".format(main_path, *en_de)
     load_from_fr_en = "{}/model/{}/{}".format(main_path, *fr_en)
     load_from_en_de = "{}_best.pt".format(load_from_en_de) if args.cpt_iter == "best" else "{}_iter={}.pt".format(load_from_en_de, args.cpt_iter)
