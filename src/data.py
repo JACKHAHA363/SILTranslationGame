@@ -13,6 +13,11 @@ from contextlib import ExitStack
 
 from utils import which_machine, cuda
 
+# Constant
+PAD = '<pad>'
+UNK = '<unk>'
+BOS = '<bos>'
+EOS = '<eos>'
 
 def dyn_batch_without_padding(new, i, sofar):
     if hasattr(new, "src"):
@@ -36,9 +41,9 @@ def build_dataset(args, dataset):
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     train_repeat = False if args.setup == "ranker" else True
     if dataset == "iwslt":
-        SRC = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
+        SRC = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK, \
                           include_lengths=True, batch_first=True)
-        TRG = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
+        TRG = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK, \
                           include_lengths=True, batch_first=True)
 
         src, trg = ["."+xx for xx in args.pair.split("_")]
@@ -71,11 +76,11 @@ def build_dataset(args, dataset):
                               'voc_sz_trg': len(TRG.vocab)})
 
     elif dataset == "multi30k":
-        FR = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+        FR = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
                          include_lengths=True, batch_first=True)
-        EN = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+        EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
                          include_lengths=True, batch_first=True)
-        DE = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+        DE = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
                          include_lengths=True, batch_first=True)
 
         vocabs = [fr_vocab, en_vocab, de_vocab]
@@ -110,9 +115,9 @@ def build_dataset(args, dataset):
             args.__dict__.update({'FR': FR, "DE": DE, "EN": EN})
 
     elif dataset == "coco":
-        EN   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                           include_lengths=True, batch_first=True)
-        EN.vocab = TextVocab(itos=torch.load(bpe_path + en_vocab))
+        EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
+                         include_lengths=True, batch_first=True)
+        EN.vocab = TextVocab(counter=torch.load(bpe_path + en_vocab))
 
         fields = [EN]*5
         exts = ['.1', '.2', '.3', '.4', '.5']
@@ -138,7 +143,7 @@ def build_dataset(args, dataset):
         args.__dict__.update({"EN":EN})
 
     elif dataset in ['wikitext2', 'wikitext103']:
-        EN = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+        EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
                          batch_first=False)
         EN.vocab = TextVocab(counter=torch.load(join(bpe_path, en_vocab)))
 
@@ -200,7 +205,7 @@ def data_path(dataset, args):
 class TextVocab(vocab.Vocab):
     def __init__(self, counter):
         super(TextVocab, self).__init__(counter=counter,
-                                        specials=['<PAD>', '<UNK>', '<BOS>', '<EOS>'],
+                                        specials=[PAD, UNK, BOS, EOS],
                                         specials_first=True)
 
 
