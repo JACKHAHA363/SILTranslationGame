@@ -13,6 +13,7 @@ from contextlib import ExitStack
 
 from utils import which_machine, cuda
 
+
 def dyn_batch_without_padding(new, i, sofar):
     if hasattr(new, "src"):
         return sofar + max(len(new.src), len(new.trg))
@@ -32,10 +33,7 @@ def build_dataset(args, dataset):
 
     # Determine corpora path
     machine = which_machine()
-    if machine == 'mila':
-        vocab_path = join(dirname(dirname(abspath(__file__))), 'data/bpe')
-    else:
-        raise ValueError
+    bpe_path = args.bpe_path
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     train_repeat = False if args.setup == "ranker" else True
     if dataset == "iwslt":
@@ -50,10 +48,10 @@ def build_dataset(args, dataset):
         vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
 
         for (field, vocab) in zip([SRC, TRG], vocabs):
-            field.vocab = TextVocab(counter=torch.load(join(vocab_path, vocab)))
+            field.vocab = TextVocab(counter=torch.load(join(bpe_path, vocab)))
 
-        train_path = join(vocab_path, 'iwslt', pair, 'train.' + pair)
-        dev_path = join(vocab_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
+        train_path = join(bpe_path, 'iwslt', pair, 'train.' + pair)
+        dev_path = join(bpe_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
         train_data = NormalTranslationDataset(path=train_path,
                                               exts=(src, trg), fields=(SRC, TRG),
                                               load_dataset=args.load_dataset, save_dataset=args.save_dataset,
@@ -86,13 +84,13 @@ def build_dataset(args, dataset):
         exts = ['.fr', '.en', '.de']
 
         for (field, vocab) in zip(fields, vocabs):
-            field.vocab = TextVocab(counter=torch.load(join(vocab_path, vocab)))
+            field.vocab = TextVocab(counter=torch.load(join(bpe_path, vocab)))
 
-        train_data = TripleTranslationDataset(path=os.path.join(vocab_path, 'multi30k', 'train'),
+        train_data = TripleTranslationDataset(path=os.path.join(bpe_path, 'multi30k', 'train'),
                                               exts=exts, fields=fields,
                                               load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        dev_data = TripleTranslationDataset(path=os.path.join(vocab_path, 'multi30k', 'val'),
+        dev_data = TripleTranslationDataset(path=os.path.join(bpe_path, 'multi30k', 'val'),
                                             exts=exts, fields=fields,
                                             load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
@@ -115,7 +113,7 @@ def build_dataset(args, dataset):
     elif dataset == "coco":
         EN   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
                            include_lengths=True, batch_first=True)
-        EN.vocab = TextVocab(itos=torch.load(vocab_path + en_vocab))
+        EN.vocab = TextVocab(itos=torch.load(bpe_path + en_vocab))
 
         fields = [EN]*5
         exts = ['.1', '.2', '.3', '.4', '.5']
@@ -141,32 +139,32 @@ def build_dataset(args, dataset):
         args.__dict__.update({"EN":EN})
 
     elif dataset in ['wikitext2', 'wikitext103']:
-        EN   = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>", \
-                          batch_first=False)
-        EN.vocab = TextVocab(itos=torch.load(vocab_path + en_vocab))
+        EN = NormalField(init_token="<BOS>", eos_token="<EOS>", pad_token="<PAD>", unk_token="<UNK>",
+                         batch_first=False)
+        EN.vocab = TextVocab(counter=torch.load(join(bpe_path, en_vocab)))
 
         train = "wiki.train.raw.bpe"
         dev = "wiki.valid.raw.bpe"
 
         train_data = LanguageModelingDataset(path=data_prefix + train, field=EN,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+                                             load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
         dev_data = LanguageModelingDataset(path=data_prefix + dev, field=EN,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+                                           load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        train_it  = data.BPTTIterator(train_data, args.batch_size, device=device, \
-                                        train=True, repeat=train_repeat, shuffle=True,\
-                                        bptt_len=args.seq_len)
-        dev_it    = data.BPTTIterator(dev_data, args.batch_size, device=device, \
-                                        train=False, repeat=False, \
-                                        bptt_len=args.seq_len)
+        train_it = data.BPTTIterator(train_data, args.batch_size, device=device,
+                                     train=True, repeat=train_repeat, shuffle=True,
+                                     bptt_len=args.seq_len)
+        dev_it = data.BPTTIterator(dev_data, args.batch_size, device=device,
+                                   train=False, repeat=False,
+                                   bptt_len=args.seq_len)
 
-        args.__dict__.update({"EN":EN})
+        args.__dict__.update({"EN": EN})
 
-    args.__dict__.update({'pad_token': 0, \
-                          'unk_token': 1, \
-                          'init_token': 2, \
-                          'eos_token': 3, \
+    args.__dict__.update({'pad_token': 0,
+                          'unk_token': 1,
+                          'init_token': 2,
+                          'eos_token': 3,
                          })
 
     return train_it, dev_it
@@ -203,7 +201,7 @@ def data_path(dataset, args):
 class TextVocab(vocab.Vocab):
     def __init__(self, counter):
         super(TextVocab, self).__init__(counter=counter,
-                                        specials=['<PAD>', '<BOS>', '<UNK>', '<EOS>'],
+                                        specials=['<PAD>', '<UNK>', '<BOS>', 'EOS'],
                                         specials_first=True)
 
 
@@ -258,8 +256,8 @@ class NormalField(data.Field):
             tok for tok in [self.pad_token, self.unk_token, self.init_token,
                             self.eos_token]
             if tok is not None))
-
         self.vocab = TextVocab(counter, specials=specials, **kwargs)
+
 
 class TranslationDataset(data.Dataset):
     """Defines a dataset for machine translation."""
@@ -330,6 +328,7 @@ class TranslationDataset(data.Dataset):
         return tuple(d for d in (train_data, val_data, test_data)
                      if d is not None)
 
+
 class NormalTranslationDataset(TranslationDataset):
     """Defines a dataset for machine translation."""
 
@@ -369,6 +368,7 @@ class NormalTranslationDataset(TranslationDataset):
 
         super(TranslationDataset, self).__init__(examples, fields, **kwargs)
 
+
 class TripleTranslationDataset(TranslationDataset):
 
     def __init__(self, path, exts, fields, load_dataset=False, save_dataset=False, **kwargs):
@@ -391,6 +391,7 @@ class TripleTranslationDataset(TranslationDataset):
                 print ("Saved TorchText dataset")
 
         super(TranslationDataset, self).__init__(examples, fields, **kwargs)
+
 
 class ParallelTranslationDataset(TranslationDataset):
     """ Define a N-parallel dataset: supports abitriry numbers of input streams"""
@@ -419,6 +420,7 @@ class ParallelTranslationDataset(TranslationDataset):
 
         super(TranslationDataset, self).__init__(examples, fields, **kwargs)
 
+
 class MyExample(data.Example):
     @classmethod
     def fromlist(cls, data, fields, idx):
@@ -435,6 +437,7 @@ class MyExample(data.Example):
                     setattr(ex, name, field.preprocess(val))
         setattr(ex, "idx", idx)
         return ex
+
 
 class Multi30kIterator(data.BucketIterator):
     def __iter__(self):
@@ -458,6 +461,7 @@ class Multi30kIterator(data.BucketIterator):
             if not self.repeat:
                 return
 
+
 class Multi30kBatch(data.Batch):
     def __init__(self, data=None, dataset=None, device=None):
         if data is not None:
@@ -470,6 +474,7 @@ class Multi30kBatch(data.Batch):
                     batch = [getattr(x, name) for x in data]
                     setattr(self, name, field.process(batch, device=device))
             setattr(self, "idx", cuda( torch.LongTensor( [e.idx for e in data] ) ))
+
 
 class LanguageModelingDataset(data.Dataset):
     """Defines a dataset for language modeling."""

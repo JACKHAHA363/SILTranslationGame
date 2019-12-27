@@ -24,13 +24,14 @@ if 'config' in parsed_args:
 else:
     raise ValueError('You must pass in --config!')
 
-if 'exp_dir' in parsed_args:
-    print('exp_dir', parsed_args['exp_dir'])
-else:
-    raise ValueError('You must pass in the --exp_dir')
-
 # Update some of them with command line
 args.update(parsed_args)
+
+if not hasattr(args, 'exp_dir'):
+    raise ValueError('You must provide exp_dir')
+if not hasattr(args, 'bpe_dir'):
+    raise ValueError('You must provide bpe_dir')
+
 args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
