@@ -43,7 +43,8 @@ class Metrics:
 
     def __repr__(self):
         return ("{}: ".format(self.name) +
-               "[{}]".format( ', '.join(["{:.4f}".format(getattr(self, metric)) for metric, value in self.metrics.items() if value is not 0 ] ) ) )
+               "[{}]".format( ', '.join(["{}: {:.4f}".format(metric, getattr(self, metric))
+                                         for metric, value in self.metrics.items() if value is not 0])))
 
     def reset(self):
         self.count = 0
