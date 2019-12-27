@@ -69,6 +69,18 @@ def _download_multi30k():
 
 _download_multi30k()
 
+def _download_wikitext103():
+    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext103')
+    if os.path.exists(corpus_dir):
+        LOGGER.info('wikitext103 exists, skipping...')
+        return
+    LOGGER.info('Downloading wikitext103...')
+    wget_cmd = ['wget', 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip', '-P', corpus_dir]
+    call(wget_cmd)
+
+_download_wikitext103()
+
+
 """
 Tokenize
 """

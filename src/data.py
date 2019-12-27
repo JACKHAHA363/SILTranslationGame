@@ -32,7 +32,6 @@ def build_dataset(args, dataset):
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
 
     # Determine corpora path
-    machine = which_machine()
     bpe_path = args.bpe_path
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     train_repeat = False if args.setup == "ranker" else True
@@ -143,13 +142,13 @@ def build_dataset(args, dataset):
                          batch_first=False)
         EN.vocab = TextVocab(counter=torch.load(join(bpe_path, en_vocab)))
 
-        train = "wiki.train.raw.bpe"
-        dev = "wiki.valid.raw.bpe"
+        train = join(bpe_path, dataset, 'train.bpe')
+        dev = join(bpe_path, dataset, 'valid.bpe')
 
-        train_data = LanguageModelingDataset(path=data_prefix + train, field=EN,
+        train_data = LanguageModelingDataset(path=train, field=EN,
                                              load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
-        dev_data = LanguageModelingDataset(path=data_prefix + dev, field=EN,
+        dev_data = LanguageModelingDataset(path=dev, field=EN,
                                            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
 
         train_it = data.BPTTIterator(train_data, args.batch_size, device=device,
