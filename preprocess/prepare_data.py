@@ -13,7 +13,6 @@ ROOT_BPE_DIR = './data/bpe'
 FR = '.fr'
 EN = '.en'
 DE = '.de'
-MIN_FREQ = 10
 
 LOGGER = logging.getLogger()
 
@@ -270,7 +269,13 @@ from collections import Counter
 
 for lang in [FR, EN, DE]:
     counter = Counter()
-    for fpath in os.popen('find ' + ROOT_BPE_DIR + ' -regex ".*\{}"'.format(lang)):
+    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'iwslt') + ' -regex ".*\{}"'.format(lang)):
+        fpath = fpath.rstrip('\n')
+        with open(fpath) as f:
+            for line in f:
+                for word in line.rstrip('\n').split():
+                    counter[word] += 1
+    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'multi30k') + ' -regex ".*\{}"'.format(lang)):
         fpath = fpath.rstrip('\n')
         with open(fpath) as f:
             for line in f:
