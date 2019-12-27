@@ -69,19 +69,19 @@ def _download_multi30k():
 
 _download_multi30k()
 
-def _download_wikitext103():
-    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext-103')
+def _download_wikitext2():
+    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext-2')
     if os.path.exists(corpus_dir):
-        LOGGER.info('wikitext103 exists, skipping...')
+        LOGGER.info('wikitext2 exists, skipping...')
         return
-    LOGGER.info('Downloading wikitext103...')
-    wget_cmd = ['wget', 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip']
+    LOGGER.info('Downloading wikitext2...')
+    wget_cmd = ['wget', 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip']
     call(wget_cmd)
-    unzip_cmd = ['unzip', 'wikitext-103-v1.zip', '-d', ROOT_CORPUS_DIR]
+    unzip_cmd = ['unzip', 'wikitext-2-v1.zip', '-d', ROOT_CORPUS_DIR]
     call(unzip_cmd)
-    call(['rm', 'wikitext-103-v1.zip'])
+    call(['rm', 'wikitext-2-v1.zip'])
 
-_download_wikitext103()
+_download_wikitext2()
 
 
 """
@@ -146,6 +146,24 @@ def _tokenize_multi30k():
 
 
 _tokenize_multi30k()
+
+
+def _tokenize_wikitext2():
+    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext-2')
+    prefixs = ['train', 'valid']
+    tok_dir = join(ROOT_TOK_DIR, 'wikitext2')
+    if os.path.exists(tok_dir):
+        LOGGER.info('wikitext2 tokens exists, skipping...')
+        return
+    LOGGER.info('Tokenizing wikitext2...')
+    os.makedirs(tok_dir)
+    for prefix in prefixs:
+        file_name = 'wiki.{}.tokens'.format(prefix)
+        in_file = join(corpus_dir, file_name)
+        out_file = join(tok_dir, 'wiki.{}'.format(prefix))
+        _tokenize(in_file, out_file, EN)
+
+_tokenize_wikitext2()
 
 """
 LEARN BPE and apply it to corpus
@@ -224,9 +242,25 @@ def apply_bpe_multi30k():
         _apply_bpe(in_file, out_file)
 
 
+def apply_bpe_wikitext2():
+    bpe_dir = join(ROOT_BPE_DIR, 'wikitext2')
+    if os.path.exists(bpe_dir):
+        LOGGER.info('BPE wikitext2 exists, skipping...')
+        return
+    os.makedirs(bpe_dir)
+    tok_dir = join(ROOT_TOK_DIR, 'wikitext2')
+    prefixs = ['train', 'valid']
+    for prefix in prefixs:
+        file_name = 'wiki.' + prefix
+        in_file = join(tok_dir, file_name)
+        out_file = join(bpe_dir, file_name)
+        _apply_bpe(in_file, out_file)
+
+
 apply_bpe_multi30k()
 apply_bpe_iwslt(FR, EN)
 apply_bpe_iwslt(EN, DE)
+apply_bpe_wikitext2()
 
 """
 Converting vocab to itos
