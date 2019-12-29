@@ -64,6 +64,7 @@ def _download_multi30k():
         wget_cmd = ['wget', base_url.format(prefix, lang), '-P', corpus_dir]
         call(wget_cmd)
         call(['gunzip', '-k', join(corpus_dir, '{}{}.gz'.format(prefix, lang))])
+        call(['rm', join(corpus_dir, '{}{}.gz'.format(prefix, lang))])
 
 
 _download_multi30k()
@@ -82,6 +83,19 @@ def _download_wikitext2():
 
 _download_wikitext2()
 
+def _download_wikitext103():
+    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext-103')
+    if os.path.exists(corpus_dir):
+        LOGGER.info('wikitext103 exists, skipping...')
+        return
+    LOGGER.info('Downloading wikitext103...')
+    wget_cmd = ['wget', 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip']
+    call(wget_cmd)
+    unzip_cmd = ['unzip', 'wikitext-103-v1.zip', '-d', ROOT_CORPUS_DIR]
+    call(unzip_cmd)
+    call(['rm', 'wikitext-103-v1.zip'])
+
+_download_wikitext103()
 
 """
 Tokenize
@@ -164,6 +178,24 @@ def _tokenize_wikitext2():
 
 _tokenize_wikitext2()
 
+
+def _tokenize_wikitext103():
+    corpus_dir = join(ROOT_CORPUS_DIR, 'wikitext-103')
+    prefixs = ['train', 'valid']
+    tok_dir = join(ROOT_TOK_DIR, 'wikitext103')
+    if os.path.exists(tok_dir):
+        LOGGER.info('wikitext103 tokens exists, skipping...')
+        return
+    LOGGER.info('Tokenizing wikitext103...')
+    os.makedirs(tok_dir)
+    for prefix in prefixs:
+        file_name = 'wiki.{}.tokens'.format(prefix)
+        in_file = join(corpus_dir, file_name)
+        out_file = join(tok_dir, 'wiki.{}'.format(prefix))
+        _tokenize(in_file, out_file, EN)
+
+_tokenize_wikitext103()
+
 """
 LEARN BPE and apply it to corpus
 """
@@ -172,6 +204,7 @@ SUBWORD = join(os.path.dirname(__file__), 'subword-nmt')
 LEARN_BPE = join(SUBWORD, 'learn_bpe.py')
 APPLY_BPE = join(SUBWORD, 'apply_bpe.py')
 
+
 def learn_bpe():
     """ Learn the BPE and get vocab """
     if not os.path.exists(ROOT_BPE_DIR):
@@ -179,9 +212,16 @@ def learn_bpe():
 
     if not os.path.exists(join(ROOT_BPE_DIR, 'bpe.codes')):
         cmd = ['cat']
-        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.en"')]
-        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.fr"')]
-        cmd += [line.rstrip('\n') for line in os.popen('find ' + ROOT_TOK_DIR + ' -regex ".*\.de"')]
+        ## IWSLT
+        #cmd += [line.rstrip('\n') for line in os.popen('find ' + join(ROOT_TOK_DIR, 'iwslt/fr-en') + ' -regex ".*\.en"')]
+        #cmd += [line.rstrip('\n') for line in os.popen('find ' + join(ROOT_TOK_DIR, 'iwslt/fr-en') + ' -regex ".*\.fr"')]
+
+        # Multitask30k
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + join(ROOT_TOK_DIR, 'multi30k') + ' -regex ".*\.en"')]
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + join(ROOT_TOK_DIR, 'multi30k') + ' -regex ".*\.fr"')]
+        cmd += [line.rstrip('\n') for line in os.popen('find ' + join(ROOT_TOK_DIR, 'multi30k') + ' -regex ".*\.de"')]
+
+        # Learn BPE
         cmd += ['|']
         cmd += [LEARN_BPE, '-s', '25000']
         cmd += ['>', join(ROOT_BPE_DIR, 'bpe.codes')]
@@ -256,10 +296,25 @@ def apply_bpe_wikitext2():
         _apply_bpe(in_file, out_file)
 
 
+def apply_bpe_wikitext103():
+    bpe_dir = join(ROOT_BPE_DIR, 'wikitext103')
+    if os.path.exists(bpe_dir):
+        LOGGER.info('BPE wikitext103 exists, skipping...')
+        return
+    os.makedirs(bpe_dir)
+    tok_dir = join(ROOT_TOK_DIR, 'wikitext103')
+    prefixs = ['train', 'valid']
+    for prefix in prefixs:
+        file_name = 'wiki.' + prefix
+        in_file = join(tok_dir, file_name)
+        out_file = join(bpe_dir, file_name)
+        _apply_bpe(in_file, out_file)
+
 apply_bpe_multi30k()
 apply_bpe_iwslt(FR, EN)
 apply_bpe_iwslt(EN, DE)
 apply_bpe_wikitext2()
+#apply_bpe_wikitext103()
 
 """
 Converting vocab to itos
@@ -269,7 +324,7 @@ from collections import Counter
 
 for lang in [FR, EN, DE]:
     counter = Counter()
-    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'iwslt') + ' -regex ".*\{}"'.format(lang)):
+    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'iwslt/fr-en') + ' -regex ".*\{}"'.format(lang)):
         fpath = fpath.rstrip('\n')
         with open(fpath) as f:
             for line in f:
