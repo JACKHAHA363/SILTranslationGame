@@ -27,7 +27,6 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
                 src_lang, trg_lang = args.pair.split("_")
                 src, src_len = dev_batch.__dict__[src_lang]
                 trg, trg_len = dev_batch.__dict__[trg_lang]
-            batch_size = len(src)
             logits, _ = model(src[:,1:], src_len-1, trg[:,:-1])
             nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
                                   ignore_index=0)
