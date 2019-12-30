@@ -123,7 +123,6 @@ def get_hp_str(args):
                  ""
     elif args.setup == "ranker":
         hp_str = "{}_".format(args.setup) + \
-                 "{}_".format(args.dataset.lower()) + \
                  "{}".format( "imgpred_{}_m{}_".format(args.img_pred_loss, args.margin) ) +\
                  "{}".format( "noimg{}_".format(args.no_img) if args.img_pred_loss == "nll" else "" ) +\
                  "img{}_emb{}_hid{}_".format(args.D_img, args.D_emb, args.D_hid) + \
