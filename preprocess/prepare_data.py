@@ -95,7 +95,7 @@ def _download_wikitext103():
     call(unzip_cmd)
     call(['rm', 'wikitext-103-v1.zip'])
 
-_download_wikitext103()
+#_download_wikitext103()
 
 """
 Tokenize
@@ -194,7 +194,7 @@ def _tokenize_wikitext103():
         out_file = join(tok_dir, 'wiki.{}'.format(prefix))
         _tokenize(in_file, out_file, EN)
 
-_tokenize_wikitext103()
+#_tokenize_wikitext103()
 
 """
 LEARN BPE and apply it to corpus
@@ -338,3 +338,11 @@ for lang in [FR, EN, DE]:
                     counter[word] += 1
     LOGGER.info('{} vocab size: {}'.format(lang, len(counter)))
     torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
+
+"""
+Prepare Flickr30 images
+"""
+call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/train.txt', '-P',
+      join(ROOT_BPE_DIR, 'multi30k')])
+call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/val.txt', '-P',
+      join(ROOT_BPE_DIR, 'multi30k')])
