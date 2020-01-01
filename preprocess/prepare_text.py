@@ -4,12 +4,21 @@ from itertools import product
 from os.path import join, basename
 from subprocess import call
 from torchtext.datasets import IWSLT
-from tqdm import tqdm
 import logging
+import argparse
 
-ROOT_CORPUS_DIR = './data/corpus/'
-ROOT_TOK_DIR = './data/tok'
-ROOT_BPE_DIR = './data/bpe'
+
+def get_data_dir():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-data_dir', required=True)
+    args = parser.parse_args()
+    return os.path.abspath(args.data_dir)
+
+
+DATA_DIR = get_data_dir()
+ROOT_CORPUS_DIR = os.path.join(DATA_DIR, 'corpus')
+ROOT_TOK_DIR = os.path.join(DATA_DIR, 'tol')
+ROOT_BPE_DIR = os.path.join(DATA_DIR, 'bpe')
 FR = '.fr'
 EN = '.en'
 DE = '.de'
