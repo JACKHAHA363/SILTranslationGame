@@ -90,6 +90,10 @@ def train_model(args, model, iterators, extra_input):
     best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=model, opt=opt, path=args.model_path + args.id_str, gpu=args.gpu, debug=args.debug)
 
     for iters, train_batch in enumerate(train_it):
+        if iters >= args.max_training_steps:
+            args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
+            break
+
         if not args.debug and iters in args.save_at:
             args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
             with torch.cuda.device(args.gpu):

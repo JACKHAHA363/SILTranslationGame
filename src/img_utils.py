@@ -106,7 +106,7 @@ def _extract_img_features(cfg):
     elif cfg.crops == 10:
         dataset = MyImageFolder(cfg.root, preprocess_10c)
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size, shuffle=False, num_workers=128,
+    loader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size, shuffle=False, num_workers=1,
                                          pin_memory=True)
     print('Extracting %s image features...' % cfg.model_name)
     features = {}
@@ -135,3 +135,17 @@ def _extract_img_features(cfg):
                 features[img_name] = outputs[ii, :].squeeze().cpu().numpy()
 
     return features
+
+
+if __name__ == '__main__':
+    # Extract image features
+    import argparse
+
+    # Flickr30 images features
+    cfg = argparse.Namespace()
+    cfg.rand_crop = True
+    cfg.crops = 1
+    cfg.batch_size = 32
+    cfg.root = '/network/tmp1/luyuchen/cv_datasets/flickr30k-images'
+    cfg.model_name = 'resnet152'
+    _extract_img_features(cfg)
