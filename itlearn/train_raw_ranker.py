@@ -15,7 +15,7 @@ from pathlib import Path
 import torchvision
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-from img_utils import MyImageFolder, preprocess_1c, ImageFolderWithPaths, preprocess_rc
+from img_utils import preprocess_1c, ImageFolderWithPaths, preprocess_rc
 
 def retrieval(idx, query, dim):
     # idx : (K, 1000) or (1000, K)

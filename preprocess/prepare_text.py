@@ -17,7 +17,7 @@ def get_data_dir():
 
 DATA_DIR = get_data_dir()
 ROOT_CORPUS_DIR = os.path.join(DATA_DIR, 'corpus')
-ROOT_TOK_DIR = os.path.join(DATA_DIR, 'tol')
+ROOT_TOK_DIR = os.path.join(DATA_DIR, 'tok')
 ROOT_BPE_DIR = os.path.join(DATA_DIR, 'bpe')
 FR = '.fr'
 EN = '.en'
@@ -349,9 +349,11 @@ for lang in [FR, EN, DE]:
     torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
 
 """
-Prepare Flickr30 images
+Prepare Flickr30 images for ranker
 """
-call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/train.txt', '-P',
-      join(ROOT_BPE_DIR, 'multi30k')])
-call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/val.txt', '-P',
-      join(ROOT_BPE_DIR, 'multi30k')])
+ROOT_IMG_DIR = os.path.join(DATA_DIR, 'flickr30k')
+if not os.path.exists(ROOT_IMG_DIR):
+    call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/train.txt', '-P',
+          join(ROOT_IMG_DIR)])
+    call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/val.txt', '-P',
+          join(ROOT_IMG_DIR)])
