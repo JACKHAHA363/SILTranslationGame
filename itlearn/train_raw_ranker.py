@@ -94,7 +94,7 @@ def train_model(args, model):
     train_imgs = [x.strip() for x in train_imgs if x.strip() != ""]
     train_dataset.samples = [x for x in train_dataset.samples if x[0].split("/")[-1] in train_imgs]
     train_dataset.imgs = [x for x in train_dataset.imgs if x[0].split("/")[-1] in train_imgs]
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4,
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=24,
                                                pin_memory=False)
     args.logger.info("Train loader built!")
 
@@ -116,9 +116,17 @@ def train_model(args, model):
     args.logger.info("Valid corpus built!")
 
     iters = -1
+    should_stop = False
     for epoch in range(999999999):
+        if should_stop:
+            break
+
         for idx, (train_img, lab, path) in enumerate(train_loader):
+            print(iters)
             iters += 1
+            if iters > args.max_training_steps:
+                should_stop = True
+                break
 
             if iters % args.eval_every == 0:
                 R = valid_model(args, model, valid_caps=valid_en, valid_lens=valid_en_lens,

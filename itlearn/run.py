@@ -129,11 +129,9 @@ if args.setup == "joint" and args.use_en_lm:
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
 if args.setup == "joint" and args.use_ranker:
     if args.setup == "joint" and args.use_ranker:
-        from pretrained_models import ranker
-        experiment = ranker[args.ranker_dataset][args.img_pred_loss]['experiment']
-        pt_model = ranker[args.ranker_dataset][args.img_pred_loss][args.D_img]
-        load_param_from = "{}/param/{}/{}".format(main_path, experiment, pt_model)
-        args.logger.info( "Loading ranker from: " + load_param_from )
+        assert hasattr(args, 'ranker_ckpt')
+        load_param_from = os.path.join(main_path, 'param', getattr(args, 'ranker_ckpt'))
+        args.logger.info("Loading ranker from: " + load_param_from)
         args_ = Params()
         args_.update(load_param_from)
         if args.img_pred_loss == "nll":
@@ -165,14 +163,9 @@ if args.setup == "joint" and args.use_ranker:
 
 # Loading checkpoints pretrained on IWSLT
 if args.setup == "joint":
-    if args.model == "RNNAttn":
-        en_de = ("20181223_data_correct_token", "12.24_02.30._single_rnnattn_en_de_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip1.0_")
-        fr_en = ("20181223_data_correct_token", "12.24_02.29._single_rnnattn_fr_en_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip1.0_")
-    #elif args.model == "RNN":
-    #    en_de = ("180906_02_en_de_noattn_big", "09.06_01.30._single_rnn_en_de_emb512_hid512_1l_lr1e-04_linear_ann1500k_drop0.5_clip1.0_")
-    #    fr_en = ("180906_03_fr_en_noattn_big", "09.06_01.33._single_rnn_fr_en_emb512_hid512_1l_lr3e-04_linear_ann1000k_drop0.6_clip1.0_")
-    load_from_en_de = "{}/model/{}/{}".format(main_path, *en_de)
-    load_from_fr_en = "{}/model/{}/{}".format(main_path, *fr_en)
+    assert hasattr(args, 'en_de_ckpt') and hasattr(args, 'fr_en_ckpt')
+    load_from_en_de = os.path.join(main_path, 'model', getattr(args, 'en_de_ckpt'))
+    load_from_fr_en = os.path.join(main_path, 'model', getattr(args, 'fr_en_ckpt'))
     load_from_en_de = "{}_best.pt".format(load_from_en_de) if args.cpt_iter == "best" else "{}_iter={}.pt".format(load_from_en_de, args.cpt_iter)
     load_from_fr_en = "{}_best.pt".format(load_from_fr_en) if args.cpt_iter == "best" else "{}_iter={}.pt".format(load_from_fr_en, args.cpt_iter)
 
