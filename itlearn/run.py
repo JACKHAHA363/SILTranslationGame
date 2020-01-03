@@ -29,8 +29,8 @@ args.update(parsed_args)
 
 if not hasattr(args, 'exp_dir'):
     raise ValueError('You must provide exp_dir')
-if not hasattr(args, 'bpe_dir'):
-    raise ValueError('You must provide bpe_dir')
+if not hasattr(args, 'data_dir'):
+    raise ValueError('You must provide data_dir')
 
 args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
@@ -76,7 +76,8 @@ if args.mode == "train" and not args.debug:
 
 if args.setup == "ranker":
     train_it, dev_it = {}, {}
-    for dataset in ["coco", "multi30k"]:
+    #for dataset in ["coco", "multi30k"]:
+    for dataset in ["multi30k"]:
         train_it_, dev_it_ = build_dataset(args, dataset)
         train_it[dataset] = train_it_
         dev_it[dataset] = dev_it_
@@ -126,7 +127,7 @@ if args.setup == "joint" and args.use_en_lm:
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) :
+if args.setup == "joint" and args.use_ranker:
     if args.setup == "joint" and args.use_ranker:
         from pretrained_models import ranker
         experiment = ranker[args.ranker_dataset][args.img_pred_loss]['experiment']
@@ -146,18 +147,20 @@ if args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) :
         extra_input["ranker"] = ranker
 
     img = {}
-    if args.setup == "ranker" or "multi30k" in args.dataset:
-        size = "resnet152/" if args.D_img == 2048 else "resnet34/"
-        img_path = "/private/home/jasonleeinf/corpora/multi30k/images/{}".format(size)
-        img["multi30k"] = [torch.load(img_path+x).cpu() for x in ["train_feats.pt", "valid_feats.pt"]]
-        args.logger.info("Loading {} image features: train {} valid {}".format( \
-                          args.dataset.upper(), img['multi30k'][0].shape, img['multi30k'][1].shape ))
-    if args.setup == "ranker" or "coco" in args.dataset:
-        size = "resnet152/" if args.D_img == 2048 else "resnet34/"
-        img_path = "/private/home/jasonleeinf/corpora/coco/feats/{}".format(size)
-        img["coco"] = [torch.load(img_path+x) for x in ["train_feats.pt", "valid_feats.pt"]]
-        args.logger.info("Loading {} image features: train {} valid {}".format( \
-                          args.dataset.upper(), img['coco'][0].shape, img['coco'][1].shape ))
+    if "multi30k" in args.dataset:
+        flickr30k_dir = os.path.join(args.data_dir, 'flickr30k')
+        train_feats = torch.load(os.path.join(flickr30k_dir, 'train_feat.pth'))
+        val_feats = torch.load(os.path.join(flickr30k_dir, 'val_feat.pth'))
+        img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
+        args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
+            img['multi30k'][0].shape, img['multi30k'][1].shape))
+    #if args.setup == "ranker" or "coco" in args.dataset:
+    #    raise NotImplemented
+    #    size = "resnet152/" if args.D_img == 2048 else "resnet34/"
+    #    img_path = "/private/home/jasonleeinf/corpora/coco/feats/{}".format(size)
+    #    img["coco"] = [torch.load(img_path+x) for x in ["train_feats.pt", "valid_feats.pt"]]
+    #    args.logger.info("Loading {} image features: train {} valid {}".format( \
+    #                      args.dataset.upper(), img['coco'][0].shape, img['coco'][1].shape ))
     extra_input["img"] = img
 
 # Loading checkpoints pretrained on IWSLT

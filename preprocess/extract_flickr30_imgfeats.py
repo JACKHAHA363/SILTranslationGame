@@ -42,14 +42,25 @@ def main():
     flickr30k_dir = os.path.join(data_dir, 'flickr30k')
 
     # Flickr30 images features
-    cfg = argparse.Namespace()
-    cfg.rand_crop = True
-    cfg.crops = 1
-    cfg.batch_size = 64
-    cfg.root = flickr30k_dir
-    cfg.model_name = 'resnet152'
-    features = _extract_img_features(cfg)
-    torch.save(features, os.path.join(flickr30k_dir, 'all_feat.pth'))
+    if not os.path.exists(os.path.join(flickr30k_dir, 'train_feat.pth')):
+        cfg = argparse.Namespace()
+        cfg.rand_crop = True
+        cfg.crops = 1
+        cfg.batch_size = 64
+        cfg.root = flickr30k_dir
+        cfg.model_name = 'resnet152'
+        feats = _extract_img_features(cfg)
+
+        with open(os.path.join(flickr30k_dir, 'train.txt')) as f:
+            train_split = f.readlines()
+            train_split = [line.rstrip('\n') for line in train_split]
+            train_feats = [feats[fname] for fname in train_split]
+        with open(os.path.join(flickr30k_dir, 'val.txt')) as f:
+            val_split = f.readlines()
+            val_split = [line.rstrip('\n') for line in val_split]
+            val_feats = [feats[fname] for fname in val_split]
+        torch.save(train_feats, os.path.join(flickr30k_dir, 'train_feat.pth'))
+        torch.save(val_feats, os.path.join(flickr30k_dir, 'val_feat.pth'))
 
 
 if __name__ == '__main__':

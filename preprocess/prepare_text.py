@@ -6,6 +6,7 @@ from subprocess import call
 from torchtext.datasets import IWSLT
 import logging
 import argparse
+from shutil import rmtree
 
 
 def get_data_dir():
@@ -332,28 +333,53 @@ import torch
 from collections import Counter
 
 for lang in [FR, EN, DE]:
-    counter = Counter()
-    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'iwslt/fr-en') + ' -regex ".*\{}"'.format(lang)):
-        fpath = fpath.rstrip('\n')
-        with open(fpath) as f:
-            for line in f:
-                for word in line.rstrip('\n').split():
-                    counter[word] += 1
-    for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'multi30k') + ' -regex ".*\{}"'.format(lang)):
-        fpath = fpath.rstrip('\n')
-        with open(fpath) as f:
-            for line in f:
-                for word in line.rstrip('\n').split():
-                    counter[word] += 1
-    LOGGER.info('{} vocab size: {}'.format(lang, len(counter)))
-    torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
+    if not os.path.exists(join(ROOT_BPE_DIR, 'vocab' + lang + '.pth')):
+        counter = Counter()
+        for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'iwslt/fr-en') + ' -regex ".*\{}"'.format(lang)):
+            fpath = fpath.rstrip('\n')
+            with open(fpath) as f:
+                for line in f:
+                    for word in line.rstrip('\n').split():
+                        counter[word] += 1
+        for fpath in os.popen('find ' + join(ROOT_BPE_DIR, 'multi30k') + ' -regex ".*\{}"'.format(lang)):
+            fpath = fpath.rstrip('\n')
+            with open(fpath) as f:
+                for line in f:
+                    for word in line.rstrip('\n').split():
+                        counter[word] += 1
+        LOGGER.info('{} vocab size: {}'.format(lang, len(counter)))
+        torch.save(counter, join(ROOT_BPE_DIR, 'vocab' + lang + '.pth'))
 
 """
 Prepare Flickr30 images for ranker
 """
 ROOT_IMG_DIR = os.path.join(DATA_DIR, 'flickr30k')
-if not os.path.exists(ROOT_IMG_DIR):
+if not os.path.exists(join(ROOT_IMG_DIR, 'train.txt')):
     call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/train.txt', '-P',
           join(ROOT_IMG_DIR)])
     call(['wget', 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/image_splits/val.txt', '-P',
           join(ROOT_IMG_DIR)])
+
+ROOT_CAP_DIR = os.path.join(ROOT_IMG_DIR, 'caps')
+raw_url = "https://github.com/multi30k/dataset/raw/master/data/task2/raw/{}.{}.en.gz"
+if not os.path.exists(ROOT_CAP_DIR):
+    # Download original
+    raw_dir = os.path.join(ROOT_CAP_DIR, 'raw')
+    for split in ['train', 'val']:
+        for i in range(1, 6):
+            wget_cmd = ['wget', raw_url.format(split, i), '-P', raw_dir]
+            call(wget_cmd)
+            call(['gunzip', '-k', join(raw_dir, '{}.{}.en.gz'.format(split, i))])
+            call(['rm', join(raw_dir, '{}.{}.en.gz'.format(split, i))])
+
+            # Tokenize
+            infile = join(raw_dir, '{}.{}.en'.format(split, i))
+            outfile = join(raw_dir, '{}.{}.en.tok'.format(split, i))
+            _tokenize(infile, outfile, EN)
+
+            # BPE
+            bpe_out = join(ROOT_CAP_DIR, '{}.{}.bpe'.format(split, i))
+            _apply_bpe(outfile, bpe_out)
+
+    # Remove corpus
+    rmtree(raw_dir)

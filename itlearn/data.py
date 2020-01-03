@@ -37,7 +37,7 @@ def build_dataset(args, dataset):
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
 
     # Determine corpora path
-    bpe_path = args.bpe_dir
+    bpe_path = os.path.join(args.data_dir, 'bpe')
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     train_repeat = False if args.setup == "ranker" else True
     if dataset == "iwslt":
