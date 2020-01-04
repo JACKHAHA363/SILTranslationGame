@@ -123,9 +123,7 @@ class ImageGrounding(ArgsModule):
                 loss = cost_cap.max(1)[0] + cost_img.max(0)[0] # (batch_size)
             else:
                 loss = cost_cap.mean(dim=1) + cost_img.mean(dim=0) # (batch_size)
-
         R['loss'] = loss
-
         return R
 
     def get_cap_rep(self, x, x_len):
@@ -139,6 +137,45 @@ class ImageGrounding(ArgsModule):
         f_idx = (x_len - 1)[:,None,None].repeat(1, 1, self.D_hid)
         f_out = f_out.gather(dim=1, index=f_idx).view(batch_size, -1) # (batch_size, D_hid)
         return f_out
+
+    def batch_enc_img(self, img_feat):
+        """
+        :param img_feat: [NB_img, D_img]
+        :return: [NB_img, D_hid]
+        """
+        batch_size = 64
+        result = []
+        start = 0
+        while start <= img_feat.shape[0]:
+            end = start + batch_size
+            batch_img_feat = cuda(img_feat[start: end])
+            batch_img_feat = F.dropout(batch_img_feat,
+                                       p=self.drop_ratio,
+                                       training=self.training )
+            batch_img_feat = self.img_enc(batch_img_feat)
+            result.append(batch_img_feat)
+            start = end
+        result = torch.cat(result, dim=0)
+        return normf(result)
+
+    def batch_cap_rep(self, sents, sent_lens):
+        """
+        :param sents: [NB_SENT, len]
+        :param sent_lens: [NB_SENT]
+        :return: [NB_X, D_hid]
+        """
+        batch_size = 64
+        start = 0
+        result = []
+        while start <= sents.shape[0]:
+            end = start + batch_size
+            batch_sent = cuda(sents[start: end])
+            batch_len = cuda(sent_lens[start: end])
+            sent_enc = self.get_cap_rep(batch_sent, batch_len)
+            result.append(sent_enc)
+            start = end
+        result = torch.cat(result, dim=0)
+        return normf(result)
 
 class RNNLM(ArgsModule):
     def __init__(self, args, voc_sz):
