@@ -7,7 +7,9 @@ from torchtext.datasets import IWSLT
 import logging
 import argparse
 from shutil import rmtree
+import json
 import torch
+import tqdm
 from collections import Counter
 
 
@@ -19,7 +21,7 @@ def get_data_dir():
 
 
 DATA_DIR = get_data_dir()
-ROOT_TMP_DIR = './tmp'
+ROOT_TMP_DIR = os.path.join(os.path.dirname(DATA_DIR), 'tmp')
 ROOT_CORPUS_DIR = os.path.join(ROOT_TMP_DIR, 'corpus')
 ROOT_TOK_DIR = os.path.join(ROOT_TMP_DIR, 'tok')
 ROOT_BPE_DIR = os.path.join(DATA_DIR, 'bpe')
@@ -150,6 +152,51 @@ def iwslt():
             _apply_bpe(in_file=tok_file, out_file=bpe_file)
 
 
+def coco():
+    """ Download coco captions """
+    if os.path.exists(join(ROOT_BPE_DIR, 'coco')):
+        LOGGER.info('COCO captions exists, skipping...')
+        return
+    os.makedirs(join(ROOT_BPE_DIR, 'coco'))
+    
+    # Download
+    corpus_dir = join(ROOT_CORPUS_DIR, 'coco')
+    wget_cmd = ['wget', "http://images.cocodataset.org/annotations/annotations_trainval2014.zip", '-P', corpus_dir]
+    call(wget_cmd)
+    unzip_cmd = ['unzip', join(corpus_dir, 'annotations_trainval2014.zip'), '-d', corpus_dir]
+    call(unzip_cmd)
+    call(['rm', join(corpus_dir, 'annotations_trainval2014.zip')])
+
+    # Extract from json
+    for name in ['captions_val2014', 'captions_train2014']:
+        json_file = join(corpus_dir, 'annotations', name + '.json')
+        json_str = open(json_file).read()
+        decode = json.loads(json_str)
+        annotations = decode['annotations']
+        captions = {}
+        for annotation in tqdm.tqdm(annotations):
+            caption = annotation['caption'].rstrip('\n')
+            if caption == "":
+                raise ValueError
+            if annotation['image_id'] in captions:
+                captions[annotation['image_id']].append(caption)
+            else:
+                captions[annotation['image_id']] = [caption]
+        for i in range(1, 6):
+            orig_file = join(corpus_dir, name + '.txt.' + str(i))
+            lines = [val[i - 1] for val in captions.values()]
+            with open(orig_file, 'w') as f:
+                f.write('\n'.join(lines))
+
+            # Tokenize
+            tok_file = join(corpus_dir, name + '.tok.' + str(i))
+            _tokenize(in_file=orig_file, out_file=tok_file, lang=EN)
+
+            # BPE
+            bpe_file = join(ROOT_BPE_DIR, 'coco', name + '.bpe.' + str(i))
+            _apply_bpe(tok_file, bpe_file)
+
+
 def get_vocab():
     for lang in [FR, EN, DE]:
         if not os.path.exists(join(ROOT_BPE_DIR, 'vocab' + lang + '.pth')):
@@ -209,6 +256,7 @@ if __name__ == '__main__':
     multi30k()
     iwslt()
     flickr30k_caps()
+    coco()
     get_vocab()
-    LOGGER.info('Cleaning...')
-    rmtree(ROOT_TMP_DIR)
+    #LOGGER.info('Cleaning...')
+    #rmtree(ROOT_TMP_DIR)
