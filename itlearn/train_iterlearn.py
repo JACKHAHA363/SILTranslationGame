@@ -10,6 +10,7 @@ from copy import deepcopy
 from utils import token_analysis, get_counts, write_tb, plot_grad, cuda, xlen_to_inv_mask
 from metrics import Metrics, Best
 from misc.bleu import computeBLEU, compute_bp, print_bleu
+from run_utils import get_model
 
 from pathlib import Path
 
@@ -153,7 +154,10 @@ def train_model(args, teacher, iterators, extra_input):
     best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=teacher, opt=opt, path=args.model_path + args.id_str, gpu=args.gpu, debug=args.debug)
 
     # Prepare_init_student
-    student = deepcopy(teacher)
+    student = get_model(args)
+    student.load_state_dict(teacher.state_dict())
+    if torch.cuda.is_available() and args.gpu > -1:
+        student.cuda(args.gpu)
     for iters, train_batch in enumerate(train_it):
         if iters >= args.max_training_steps:
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
@@ -193,7 +197,7 @@ def train_model(args, teacher, iterators, extra_input):
         selfplay_step(args, extra_input, iters, loss_cos, loss_names, teacher, monitor_names, opt, params, train_batch,
                       train_metrics, writer)
 
-        if iters % args.generation_steps == 0:
+        if (iters + 1) % args.generation_steps == 0:
             args.logger.info('start imitating...')
             student.train()
             teacher.eval()
@@ -208,8 +212,8 @@ def imitate(args, student_models, teacher_models, train_it):
     l_params = [p for p in l_model.parameters() if p.requires_grad]
     l_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.l_lr)
     for iters, batch in enumerate(train_it):
-        if iters >= args.speaker_learn_steps:
-            args.logger.info('student stop learning after {} training steps'.format(args.speaker_learn_steps))
+        if iters >= args.learn_steps:
+            args.logger.info('student stop learning after {} training steps'.format(args.learn_steps))
             break
 
         # Teacher generate message
@@ -219,7 +223,7 @@ def imitate(args, student_models, teacher_models, train_it):
             de_msg, de_msg_len = _make_sure_message_valid(de_msg, de_msg_len, teacher_models.init_token)
 
         # Get fr en
-        speaker_nll = _get_nll(student_models.fr_en, batch.fr, batch.fr_len, en_msg)
+        speaker_nll = _get_nll(student_models.fr_en, batch.fr[0], batch.fr[1], en_msg)
         s_opt.zero_grad()
         speaker_nll.backward()
         nn.utils.clip_grad_norm_(s_params, 0.1)
@@ -240,9 +244,8 @@ def _make_sure_message_valid(msg, msg_len, init_token):
     msg_len += 1
 
     # Make sure padding are all zeros
-    inv_mask = xlen_to_inv_mask(msg_len)
-    msg.masked_fill_(mask=inv_mask, value=0)
-    return msg, msg_len
+    inv_mask = xlen_to_inv_mask(msg_len, seq_len=msg.shape[1])
+    msg.masked_fill_(mask=inv_mask.bool(), value=0)
 
 
 def _get_nll(single_model, src, src_len, trg):

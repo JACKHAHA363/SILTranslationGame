@@ -35,7 +35,7 @@ args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
 folders = ["event", "model", "log", "param"]
-if args.setup in ['single', 'joint']:
+if args.setup in ['single', 'joint', 'itlearn']:
     folders.append('decoding')
 
 for name in folders:
