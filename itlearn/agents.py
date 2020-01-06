@@ -78,7 +78,7 @@ class Agents(ArgsModule):
             if self.train_ranker:
                 rewards['img_pred'] = -1 * img_pred_loss.detach()
             results.update({"img_pred_loss_{}".format(self.img_pred_loss): img_pred_loss.mean()})
-            return results, rewards
+        return results, rewards
 
     def selfplay_batch(self, batch, en_lm=None, all_img=None, ranker=None):
         """ Return all stuff related to reinforce """
@@ -118,8 +118,13 @@ class Agents(ArgsModule):
     def forward(self, batch, en_lm=None, all_img=None, ranker=None):
         """ Reinforce with reward engineering """
         results, rewards = self.selfplay_batch(batch, en_lm, all_img, ranker)
-        en_msg_len = results['en_msg_len']
-        R = rewards['ce'] + rewards['lm'] * self.en_lm_nll_co + rewards['img_pred'] * self.img_pred_loss_co
+        en_msg_len = results['new_seq_lens']
+        R = rewards['ce']
+        if self.use_en_lm:
+            R += rewards['lm'] * self.en_lm_nll_co
+        if self.use_ranker:
+            R += rewards['img_pred'] * self.img_pred_loss_co
+
         if not self.fix_fr2en:
             R_b = self.fr_en.dec.R_b # (batch_size, en_msg_len)
             en_mask = xlen_to_inv_mask(en_msg_len, R_b.size(1))

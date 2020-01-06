@@ -36,7 +36,8 @@ def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
                                                 en_lm=extra_input["en_lm"],
                                                 all_img=extra_input["img"]['multi30k'][1],
                                                 ranker=extra_input["ranker"])
-            eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
+            if len(monitor_names) > 0:
+                eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
 
         bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
         bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
