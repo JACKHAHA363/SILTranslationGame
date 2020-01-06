@@ -48,15 +48,15 @@ class Agents(ArgsModule):
         batch_size = len(batch)
 
         # <BOS> removed from source Fr sentences when training Fr->En agent, hence fr_len - 1
-        fr_hid = self.fr_en.enc(fr[:,1:], fr_len-1)
+        fr_hid = self.fr_en.enc(fr[:, 1:], fr_len-1)
         # Need to predict everything except <BOS>, hence en_len-1
         send_results = self.fr_en.dec.send(fr_hid, fr_len-1, en_len-1, "reinforce", self.value_fn)
         en_msg, en_msg_len = [send_results[key] for key in ["msg", "new_seq_lens"] ]
 
-        de_input, de_target = de[:,:-1], de[:,1:].contiguous().view(-1)
+        de_input, de_target = de[:, :-1], de[:, 1:].contiguous().view(-1)
         de_logits, _ = self.en_de(en_msg, en_msg_len, de_input) # (batch_size * en_seq_len, vocab_size)
         de_nll_batch = F.cross_entropy(de_logits, de_target, ignore_index=0) # (1,)
-        results = { "ce_loss":de_nll_batch }
+        results = {"ce_loss": de_nll_batch}
 
         # de_nll : (batch_size, de_seq_len - 1)
         de_nll = F.cross_entropy(de_logits, de_target, ignore_index=0, reduction='none')
@@ -64,10 +64,7 @@ class Agents(ArgsModule):
         R = -1 * de_nll.detach() # NOTE Experiment 1 : Reward = NLL_DE
 
         # NOTE add <BOS> to beginning
-        en_msg_ = torch.cat( [ \
-                             cuda(torch.full((batch_size, 1), self.init_token)).long(),
-                             en_msg \
-                            ], dim=1 )
+        en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), self.init_token)).long(), en_msg], dim=1)
 
         if self.use_en_lm: # monitor EN LM NLL
             if "wiki" in self.en_lm_dataset:

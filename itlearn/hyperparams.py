@@ -16,7 +16,7 @@ class Params():
         with open(json_path, 'w') as f:
             json.dump(self.__dict__, f, indent=4)
 
-    def update(self, json_path):
+    def update_from_json(self, json_path):
         """Loads parameters from json file"""
         with open(json_path) as f:
             params = json.load(f)
