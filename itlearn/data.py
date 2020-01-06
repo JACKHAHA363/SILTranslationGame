@@ -117,7 +117,7 @@ def build_dataset(args, dataset):
     elif dataset == "coco":
         EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
                          include_lengths=True, batch_first=True)
-        EN.vocab = TextVocab(counter=torch.load(bpe_path + en_vocab))
+        EN.vocab = TextVocab(counter=torch.load(join(bpe_path, en_vocab)))
 
         fields = [EN]*5
         exts = ['.1', '.2', '.3', '.4', '.5']

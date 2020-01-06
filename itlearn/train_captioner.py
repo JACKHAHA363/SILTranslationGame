@@ -18,10 +18,8 @@ def valid_model(args, model, dev_it, dev_metrics, iters, loss_names, monitor_nam
         model.eval()
 
         for j, dev_batch in enumerate(dev_it):
-            img = extra_input["img"]['multi30k'][1].index_select(dim=0, index=dev_batch.idx.cpu()) # (batch_size, D_img)
+            img_input = None if args.no_img else cuda(extra_input["img"]['multi30k'][1].index_select(dim=0, index=dev_batch.idx.cpu()))
             en, en_len = dev_batch.en
-
-            img_input = None if args.no_img else cuda(img)
             decoded = model(en, img_input)
             R = {}
             R["nll"] = F.cross_entropy( decoded, en[:,1:].contiguous().view(-1), ignore_index=0 )
@@ -66,11 +64,21 @@ def train_model(args, model, iterators, extra_input):
                 gpu=args.gpu, debug=args.debug)
 
     iters = 0
+    should_stop = False
     for epoch in range(999999999):
+        if should_stop:
+            break
+
         for dataset in args.dataset.split("_"):
+            if should_stop:
+                break
+
             train_it = train_its[dataset]
             for _, train_batch in enumerate(train_it):
-                iters += 1
+                if iters >= args.max_training_steps:
+                    args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
+                    should_stop = True
+                    break
 
                 if iters % args.eval_every == 0:
                     dev_metrics.reset()
@@ -102,13 +110,12 @@ def train_model(args, model, iterators, extra_input):
                 opt.zero_grad()
 
                 batch_size = len(train_batch)
-                img = extra_input["img"][dataset][0].index_select(dim=0, index=train_batch.idx.cpu()) # (batch_size, D_img)
+                img_input = None if args.no_img else cuda(extra_input["img"][dataset][0].index_select(dim=0, index=train_batch.idx.cpu()))
                 if dataset == "coco":
                     en, en_len = train_batch.__dict__["_"+str(random.randint(1,5))]
                 elif dataset == "multi30k":
                     en, en_len = train_batch.en
 
-                img_input = None if args.no_img else cuda(img)
                 decoded = model(en, img_input)
                 R = {}
                 R["nll"] = F.cross_entropy( decoded, en[:,1:].contiguous().view(-1), ignore_index=0 )
@@ -130,6 +137,7 @@ def train_model(args, model, iterators, extra_input):
                         ipdb.set_trace()
 
                 opt.step()
+                iters += 1
 
                 if iters % args.eval_every == 0:
                     args.logger.info("update {} : {}".format(iters, str(train_metrics)))

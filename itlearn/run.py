@@ -77,7 +77,7 @@ if args.mode == "train" and not args.debug:
 if args.setup == "ranker":
     train_it, dev_it = {}, {}
     #for dataset in ["coco", "multi30k"]:
-    for dataset in ["multi30k"]:
+    for dataset in ["multi30k", "coco"]:
         train_it_, dev_it_ = build_dataset(args, dataset)
         train_it[dataset] = train_it_
         dev_it[dataset] = dev_it_
@@ -109,7 +109,7 @@ else:
 
 model_path = join(main_path, 'model/{}/{}_best.pt')
 # Loading EN LM
-extra_input = {"en_lm":None, "img":{"multi30k":[None,None]}, "ranker":None}
+extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
 if args.setup == "joint" and args.use_en_lm:
     from pretrained_models import en_lm
     experiment = en_lm[args.en_lm_dataset]['experiment']
@@ -118,7 +118,7 @@ if args.setup == "joint" and args.use_en_lm:
     args.logger.info( "Loading LM from: " + load_param_from )
     args_ = Params()
     args_.update(load_param_from)
-    LM_CLS = ImageCaptioning if args.en_lm_dataset in ["coco", "multi30k"] else RNNLM
+    LM_CLS = ImageCaptioning if args.en_lm_dataset in ["coco"] else RNNLM
     en_lm = LM_CLS(args_, len(args.EN.vocab.itos))
     en_lm.load_state_dict( torch.load(model_path.format(experiment, pt_model), map_location) )
     en_lm.eval()
