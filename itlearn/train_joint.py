@@ -29,7 +29,7 @@ def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
             en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
             de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
 
-            en_msg, de_msg, en_msg_len = model.decode(dev_batch)
+            en_msg, de_msg, en_msg_len, _ = model.decode(dev_batch)
             en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
             de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
             results, _ = model.eval_fr_en_stats(en_msg, en_msg_len, dev_batch,
@@ -158,7 +158,7 @@ def train_model(args, model, iterators, extra_input):
         opt.zero_grad()
 
         batch_size = len(train_batch)
-        R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0], ranker=extra_input["ranker"])
+        R, _ = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0], ranker=extra_input["ranker"])
         losses = [ R[key] for key in loss_names ]
 
         total_loss = 0
