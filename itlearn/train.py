@@ -73,8 +73,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 # Loading EN LM
 extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
-if args.setup == "joint" and args.use_en_lm:
-    assert hasattr(args, 'lm_ckpt')
+if args.setup == "joint" and hasattr(args, 'lm_ckpt'):
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -87,30 +86,28 @@ if args.setup == "joint" and args.use_en_lm:
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if args.setup == "joint" and args.use_ranker:
-    if args.setup == "joint" and args.use_ranker:
-        assert hasattr(args, 'ranker_ckpt')
-        ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
-        args.logger.info("Loading ranker from: " + ranker_param)
-        args_ = Params(ranker_param)
-        if args.img_pred_loss == "nll":
-            ranker = ImageCaptioning(args_, len(args.EN.vocab.itos))
-        else:
-            ranker = ImageGrounding(args_, len(args.EN.vocab.itos))
-        ranker.load_state_dict(torch.load(ranker_model, map_location) )
-        ranker.eval()
-        if torch.cuda.is_available():
-            ranker.cuda(args.gpu)
-        extra_input["ranker"] = ranker
+if args.setup == "joint" and hasattr(args, 'ranker_ckpt'):
+    assert hasattr(args, 'ranker_ckpt')
+    ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
+    args.logger.info("Loading ranker from: " + ranker_param)
+    args_ = Params(ranker_param)
+    if args.img_pred_loss == "nll":
+        ranker = ImageCaptioning(args_, len(args.EN.vocab.itos))
+    else:
+        ranker = ImageGrounding(args_, len(args.EN.vocab.itos))
+    ranker.load_state_dict(torch.load(ranker_model, map_location) )
+    ranker.eval()
+    if torch.cuda.is_available():
+        ranker.cuda(args.gpu)
+    extra_input["ranker"] = ranker
 
     img = {}
-    if "multi30k" in args.dataset:
-        flickr30k_dir = os.path.join(args.data_dir, 'flickr30k')
-        train_feats = torch.load(os.path.join(flickr30k_dir, 'train_feat.pth'))
-        val_feats = torch.load(os.path.join(flickr30k_dir, 'val_feat.pth'))
-        img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
-        args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
-            img['multi30k'][0].shape, img['multi30k'][1].shape))
+    flickr30k_dir = os.path.join(args.data_dir, 'flickr30k')
+    train_feats = torch.load(os.path.join(flickr30k_dir, 'train_feat.pth'))
+    val_feats = torch.load(os.path.join(flickr30k_dir, 'val_feat.pth'))
+    img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
+    args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
+        img['multi30k'][0].shape, img['multi30k'][1].shape))
     #if args.setup == "ranker" or "coco" in args.dataset:
     #    raise NotImplemented
     #    size = "resnet152/" if args.D_img == 2048 else "resnet34/"
@@ -159,6 +156,10 @@ if args.setup == "single":
 
 elif args.setup == "joint":
     from train_joint import train_model
+    train_model(args, model, (train_it, dev_it), extra_input)
+
+elif args.setup == '':
+    from train_iterlearn import train_model
     train_model(args, model, (train_it, dev_it), extra_input)
 
 elif args.setup == "ranker":

@@ -60,8 +60,8 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
     with torch.no_grad():
         model.eval()
         for j, dev_batch in enumerate(dev_it):
-            R, _ = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
-                         ranker=extra_input["ranker"], reward_shape=False)
+            R = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
+                      ranker=extra_input["ranker"], reward_shape=False)
             losses = [R[key] for key in loss_names]
             dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
                                    *[R[k].item() for k in monitor_names])
@@ -194,17 +194,19 @@ def train_model(args, teacher, iterators, extra_input):
                       train_metrics, writer)
 
         if iters % args.generation_steps == 0:
+            args.logger.info('start imitating...')
             student.train()
             teacher.eval()
             imitate(args, student, teacher, train_it)
             teacher.load_state_dict(student.state_dict())
 
 
-def imitate(args, opts, student_models, teacher_models, train_it):
+def imitate(args, student_models, teacher_models, train_it):
     s_model, l_model = student_models.fr_en, student_models.en_de
-    s_opt, l_opt = opts
     s_params = [p for p in s_model.parameters() if p.requires_grad]
+    s_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.s_lr)
     l_params = [p for p in l_model.parameters() if p.requires_grad]
+    l_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.l_lr)
     for iters, batch in enumerate(train_it):
         if iters >= args.speaker_learn_steps:
             args.logger.info('student stop learning after {} training steps'.format(args.speaker_learn_steps))

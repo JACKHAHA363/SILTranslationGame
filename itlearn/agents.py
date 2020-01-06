@@ -139,7 +139,7 @@ class Agents(ArgsModule):
             pg_loss = pg_loss.sum(dim=1) / (en_msg_len).float() # (batch_size)
             pg_loss = pg_loss.mean() # (1,)
             results.update({"pg_loss": pg_loss, "b_loss": b_loss})
-        return results, rewards
+        return results
 
     def decode(self, batch, en_method='argmax', de_method='argmax'):
         (fr, fr_len) = batch.fr
