@@ -13,43 +13,59 @@ from misc.bleu import computeBLEU, compute_bp, print_bleu
 
 from pathlib import Path
 
-def valid_model(args, model, dev_it, dev_metrics, loss_names, monitor_names, iters, extra_input, test_set="valid"):
+
+def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
+    """ Use greedy decoding and check scores like BLEU, language model and grounding """
+    eval_metrics = Metrics('dev_loss', *monitor_names, data_type="avg")
+    eval_metrics.reset()
     with torch.no_grad():
         unbpe = True
         model.eval()
         fr_corpus, en_corpus, de_corpus = [], [], []
         en_hyp, de_hyp = [], []
 
-        total_msg, total_ref = 0, 0
         for j, dev_batch in enumerate(dev_it):
-            fr_corpus.extend( args.FR.reverse(dev_batch.fr[0], unbpe=unbpe) )
-            en_corpus.extend( args.EN.reverse(dev_batch.en[0], unbpe=unbpe) )
-            de_corpus.extend( args.DE.reverse(dev_batch.de[0], unbpe=unbpe) )
+            fr_corpus.extend(args.FR.reverse(dev_batch.fr[0], unbpe=unbpe))
+            en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
+            de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
 
-            R = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1], ranker=extra_input["ranker"])
-            losses = [ R[key] for key in loss_names ]
-            dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
-
-            en_msg, de_msg = model.decode(dev_batch)
-            en_hyp.extend( args.EN.reverse(en_msg, unbpe=unbpe) )
-            de_hyp.extend( args.DE.reverse(de_msg, unbpe=unbpe) )
+            en_msg, de_msg, en_msg_len = model.decode(dev_batch)
+            en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
+            de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
+            results, _ = model.eval_fr_en_stats(en_msg, en_msg_len, dev_batch,
+                                                en_lm=extra_input["en_lm"],
+                                                all_img=extra_input["img"]['multi30k'][1],
+                                                ranker=extra_input["ranker"])
+            eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
 
         bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
         bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
-        args.logger.info(dev_metrics)
-        args.logger.info("Fr-En {} : {}".format(test_set, print_bleu(bleu_en)))
-        args.logger.info("En-De {} : {}".format(test_set, print_bleu(bleu_de)))
+        args.logger.info(eval_metrics)
+        args.logger.info("Fr-En {} : {}".format('valid', print_bleu(bleu_en)))
+        args.logger.info("En-De {} : {}".format('valid', print_bleu(bleu_de)))
 
         if not args.debug:
-            dest_folders = [ Path(args.decoding_path) / args.id_str / name for name in \
-                     ["en_ref", "de_ref", "fr_ref", "de_hyp_{}".format(iters), "en_hyp_{}".format(iters) ] ]
+            dest_folders = [Path(args.decoding_path) / args.id_str / name for name in
+                            ["en_ref", "de_ref", "fr_ref", "de_hyp_{}".format(iters), "en_hyp_{}".format(iters)]]
+            [dest.write_text("\n".join(string), encoding="utf-8")
+             for (dest, string) in zip(dest_folders, [en_corpus, de_corpus, fr_corpus, de_hyp, en_hyp])]
+        return eval_metrics, bleu_en, bleu_de
 
-            [ dest.write_text("\n".join(string), encoding="utf-8") for (dest, string) in zip(\
-                  dest_folders,
-                  [en_corpus, de_corpus, fr_corpus, de_hyp, en_hyp] ) ]
 
-    results = {"bleu_en":bleu_en, "bleu_de":bleu_de}
-    return results
+def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
+    """ Run reinforce on validation and record stats """
+    dev_metrics = Metrics('dev_loss', *loss_names, *monitor_names, data_type="avg")
+    dev_metrics.reset()
+    with torch.no_grad():
+        model.eval()
+        for j, dev_batch in enumerate(dev_it):
+            R, _ = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
+                         ranker=extra_input["ranker"])
+            losses = [R[key] for key in loss_names]
+            dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
+                                   *[R[k].item() for k in monitor_names])
+    return dev_metrics
+
 
 def train_model(args, model, iterators, extra_input):
     (train_it, dev_it) = iterators
@@ -70,8 +86,8 @@ def train_model(args, model, iterators, extra_input):
     loss_names = ['ce_loss']
     loss_cos = {"ce_loss": args.ce_co}
     if not args.fix_fr2en:
-        loss_names.extend( ['pg_loss', 'b_loss'] )
-        loss_cos.update( {'pg_loss': args.pg_co, 'b_loss': args.b_co} )
+        loss_names.extend(['pg_loss', 'b_loss'])
+        loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co} )
 
         if args.h_co > 0:
             loss_names.append('neg_Hs')
@@ -80,13 +96,11 @@ def train_model(args, model, iterators, extra_input):
         loss_cos['neg_Hs'] = args.h_co
 
     if args.use_ranker:
-        #monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss), "img_pred_acc_msg2img", "img_pred_acc_img2msg"])
         monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
     if args.use_en_lm:
         monitor_names.append('en_nll_lm')
 
-    train_metrics = Metrics('train_loss', *loss_names, *monitor_names, data_type = "avg")
-    dev_metrics = Metrics('dev_loss', *loss_names, *monitor_names, data_type = "avg")
+    train_metrics = Metrics('train_loss', *loss_names, *monitor_names, data_type="avg")
     best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=model, opt=opt, path=args.model_path + args.id_str, gpu=args.gpu, debug=args.debug)
 
     for iters, train_batch in enumerate(train_it):
@@ -101,17 +115,21 @@ def train_model(args, model, iterators, extra_input):
                 torch.save([iters, opt.state_dict()], '{}_iter={}.pt.states'.format( args.model_path + args.id_str, iters))
 
         if iters % args.eval_every == 0:
-            dev_metrics.reset()
-            R = valid_model(args, model, dev_it, dev_metrics, loss_names, monitor_names, iters, extra_input)
-            bleu_en, bleu_de = [ R[key] for key in ["bleu_en", "bleu_de"] ]
+            dev_metrics = valid_model(model, dev_it, loss_names, monitor_names, extra_input)
+            eval_metric, bleu_en, bleu_de = eval_model(args, model, dev_it, monitor_names, iters, extra_input)
             if not args.debug:
-                write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names], iters, \
-                         prefix="dev/")
-                write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names], iters, \
-                         prefix="dev/")
-                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()) , 'bp', 'len_ref', 'len_hyp'], bleu_en, iters, prefix="bleu_en/")
-                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()) , 'bp', 'len_ref', 'len_hyp'], bleu_de, iters, prefix="bleu_de/")
-                write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="bleu/")
+                write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names],
+                         iters, prefix="dev/")
+                write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names],
+                         iters, prefix="dev/")
+
+                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
+                         prefix="bleu_en/")
+                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
+                         prefix="bleu_de/")
+                write_tb(writer, ["eval/bleu_en", "eval/bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="bleu/")
+                write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
+                         iters, prefix="eval/")
 
             args.logger.info('model:' + args.prefix + args.hp_str)
             best.accumulate(bleu_de[0], bleu_en[0], iters)
