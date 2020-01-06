@@ -201,7 +201,7 @@ class RNNDecAttn(ArgsModule):
             self.R_b = torch.stack(self.R_b, dim=1) if value_fn else self.R_b # (batch_size, y_seq_len)
             self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
-        result = {"msg":msg.clone(), "new_seq_lens":seq_lens.clone()}
+        result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
         # NOTE en_msg_len = min( en_ref_len, whenever the model decides to output <EOS> symbol )
         if self.msg_len_ratio > 0:
             en_ref_len = torch.floor( trg_len.float() * self.msg_len_ratio ).long()
