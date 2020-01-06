@@ -128,7 +128,7 @@ def train_model(args, model, iterators, extra_input):
                          prefix="bleu_en/")
                 write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
                          prefix="bleu_de/")
-                write_tb(writer, ["eval/bleu_en", "eval/bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="bleu/")
+                write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
                 write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
                          iters, prefix="eval/")
 

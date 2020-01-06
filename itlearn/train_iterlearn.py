@@ -182,7 +182,7 @@ def train_model(args, teacher, iterators, extra_input):
                          prefix="bleu_en/")
                 write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
                          prefix="bleu_de/")
-                write_tb(writer, ["eval/bleu_en", "eval/bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="bleu/")
+                write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
                 write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
                          iters, prefix="eval/")
 
@@ -246,6 +246,7 @@ def _make_sure_message_valid(msg, msg_len, init_token):
     # Make sure padding are all zeros
     inv_mask = xlen_to_inv_mask(msg_len, seq_len=msg.shape[1])
     msg.masked_fill_(mask=inv_mask.bool(), value=0)
+    return msg, msg_len
 
 
 def _get_nll(single_model, src, src_len, trg):
