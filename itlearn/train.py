@@ -35,7 +35,7 @@ args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
 folders = ["event", "model", "log", "param"]
-if args.setup in ['single', 'joint']:
+if args.setup in ['single', 'joint', 'itlearn']:
     folders.append('decoding')
 
 for name in folders:
@@ -73,8 +73,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 # Loading EN LM
 extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
-if args.setup == "joint" and args.use_en_lm:
-    assert hasattr(args, 'lm_ckpt')
+if args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -87,30 +86,27 @@ if args.setup == "joint" and args.use_en_lm:
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if args.setup == "joint" and args.use_ranker:
-    if args.setup == "joint" and args.use_ranker:
-        assert hasattr(args, 'ranker_ckpt')
-        ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
-        args.logger.info("Loading ranker from: " + ranker_param)
-        args_ = Params(ranker_param)
-        if args.img_pred_loss == "nll":
-            ranker = ImageCaptioning(args_, len(args.EN.vocab.itos))
-        else:
-            ranker = ImageGrounding(args_, len(args.EN.vocab.itos))
-        ranker.load_state_dict(torch.load(ranker_model, map_location) )
-        ranker.eval()
-        if torch.cuda.is_available():
-            ranker.cuda(args.gpu)
-        extra_input["ranker"] = ranker
+if args.use_ranker:
+    ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
+    args.logger.info("Loading ranker from: " + ranker_param)
+    args_ = Params(ranker_param)
+    if args.img_pred_loss == "nll":
+        ranker = ImageCaptioning(args_, len(args.EN.vocab.itos))
+    else:
+        ranker = ImageGrounding(args_, len(args.EN.vocab.itos))
+    ranker.load_state_dict(torch.load(ranker_model, map_location) )
+    ranker.eval()
+    if torch.cuda.is_available():
+        ranker.cuda(args.gpu)
+    extra_input["ranker"] = ranker
 
     img = {}
-    if "multi30k" in args.dataset:
-        flickr30k_dir = os.path.join(args.data_dir, 'flickr30k')
-        train_feats = torch.load(os.path.join(flickr30k_dir, 'train_feat.pth'))
-        val_feats = torch.load(os.path.join(flickr30k_dir, 'val_feat.pth'))
-        img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
-        args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
-            img['multi30k'][0].shape, img['multi30k'][1].shape))
+    flickr30k_dir = os.path.join(args.data_dir, 'flickr30k')
+    train_feats = torch.load(os.path.join(flickr30k_dir, 'train_feat.pth'))
+    val_feats = torch.load(os.path.join(flickr30k_dir, 'val_feat.pth'))
+    img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
+    args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
+        img['multi30k'][0].shape, img['multi30k'][1].shape))
     #if args.setup == "ranker" or "coco" in args.dataset:
     #    raise NotImplemented
     #    size = "resnet152/" if args.D_img == 2048 else "resnet34/"
@@ -121,22 +117,20 @@ if args.setup == "joint" and args.use_ranker:
     extra_input["img"] = img
 
 # Loading checkpoints pretrained on IWSLT
-if args.setup == "joint":
-    assert hasattr(args, 'en_de_ckpt') and hasattr(args, 'fr_en_ckpt')
-    _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
-    _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
-
-    if args.cpt_iter != 0:
-        model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
-        args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
+if hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
+    if hasattr(args, 'en_de_ckpt') and args.en_de_ckpt is not None:
+        _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
         model.en_de.load_state_dict(torch.load(en_de_model, map_location))
         args.logger.info("Loading En -> De checkpoint : {}".format(en_de_model))
 
+    if hasattr(args, 'fr_en_ckpt') and args.fr_en_ckpt is not None:
+        _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
+        model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
+        args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
         if args.fix_fr2en:
             for param in list(model.fr_en.parameters()):
                 param.requires_grad = False
             args.logger.info("Fixed FR->EN agent")
-            #model.fr_en.dec.msg_len_ratio = -1.0 # make Fr->En agent predict its own length
 
 args.logger.info(str(model))
 
@@ -159,6 +153,10 @@ if args.setup == "single":
 
 elif args.setup == "joint":
     from train_joint import train_model
+    train_model(args, model, (train_it, dev_it), extra_input)
+
+elif args.setup == 'itlearn':
+    from train_iterlearn import train_model
     train_model(args, model, (train_it, dev_it), extra_input)
 
 elif args.setup == "ranker":

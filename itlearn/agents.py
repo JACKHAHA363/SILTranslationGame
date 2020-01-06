@@ -116,13 +116,13 @@ class Agents(ArgsModule):
         return results, rewards
 
     def forward(self, batch, en_lm=None, all_img=None, ranker=None):
-        """ Reinforce with reward engineering """
+        """ Reinforce. """
         results, rewards = self.selfplay_batch(batch, en_lm, all_img, ranker)
         en_msg_len = results['new_seq_lens']
         R = rewards['ce']
-        if self.use_en_lm:
+        if self.train_en_lm:
             R += rewards['lm'] * self.en_lm_nll_co
-        if self.use_ranker:
+        if self.train_ranker:
             R += rewards['img_pred'] * self.img_pred_loss_co
 
         if not self.fix_fr2en:
@@ -138,16 +138,16 @@ class Agents(ArgsModule):
             pg_loss = pg_loss.sum(dim=1) / (en_msg_len).float() # (batch_size)
             pg_loss = pg_loss.mean() # (1,)
             results.update({"pg_loss": pg_loss, "b_loss": b_loss})
-        return results, rewards
+        return results
 
-    def decode(self, batch):
+    def decode(self, batch, en_method='argmax', de_method='argmax'):
         (fr, fr_len) = batch.fr
         (en, en_len) = batch.en
         (de, de_len) = batch.de
         batch_size = len(batch)
 
         fr_hid = self.fr_en.enc(fr[:,1:], fr_len-1)
-        en_send_results = self.fr_en.dec.send(fr_hid, fr_len-1, en_len-1, "argmax")
+        en_send_results = self.fr_en.dec.send(fr_hid, fr_len-1, en_len-1, en_method)
         en_msg, en_msg_len = [en_send_results[key] for key in ["msg", "new_seq_lens"]]
         # NOTE new_seq_lens : give ground truth EN REF length
         # en_msg : (batch_size, seq_len)
@@ -157,11 +157,11 @@ class Agents(ArgsModule):
         #en_msg.masked_fill_(mask=inv_mask, value=0) # NOTE make sure pads are really <PAD>
 
         en_hid = self.en_de.enc(en_msg, en_msg_len)
-        de_send_results = self.en_de.dec.send(en_hid, en_msg_len, de_len-1, "argmax")
-        de_msg, de_new_len = [de_send_results[key] for key in ["msg", "new_seq_lens"]]
+        de_send_results = self.en_de.dec.send(en_hid, en_msg_len, de_len-1, de_method)
+        de_msg, de_msg_len = [de_send_results[key] for key in ["msg", "new_seq_lens"]]
         # NOTE seq_lens : give 50, terminate whenever En->De model outputs <EOS>
 
-        return en_msg, de_msg, en_msg_len
+        return en_msg, de_msg, en_msg_len, de_msg_len
 
     def multi_decode(self, batch):
         (fr, fr_len) = batch.fr

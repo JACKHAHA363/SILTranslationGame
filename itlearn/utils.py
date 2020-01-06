@@ -208,7 +208,7 @@ def sum_reward(reward, lens):
     # reward: (batch_size, seq_len)
     # lens : (batch_size)
     mask = xlen_to_inv_mask(lens, reward.size(1))
-    reward.masked_fill_(mask, 0)
+    reward.masked_fill_(mask.bool(), 0)
     reward = reward.sum(dim=-1) / lens.float() # (batch_size)
     return reward
 
