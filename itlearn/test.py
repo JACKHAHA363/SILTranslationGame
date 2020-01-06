@@ -5,6 +5,7 @@ import os
 from os.path import join
 from hyperparams import Params
 import sys
+from run_utils import get_model, get_data
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -29,8 +30,8 @@ args.debug = True
 args.batch_size = 400
 
 # Load model
-model_path = join(args.exp_dir, 'model', args.ckpt)
-model_path = '{}_best'.format(model_path)
+model = get_model(args)
+_, dev_it = get_data(args)
 
 if args.setup == "single":
     from decode_single import decode_model
@@ -38,5 +39,4 @@ elif args.setup == "joint":
     from decode_joint import decode_model
 else:
     raise ValueError
-decode_model(args, model, (dev_it))
-
+decode_model(args, model, dev_it)
