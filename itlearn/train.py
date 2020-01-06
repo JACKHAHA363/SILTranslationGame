@@ -73,7 +73,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 # Loading EN LM
 extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
-if args.setup == "joint" and hasattr(args, 'lm_ckpt'):
+if args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -86,8 +86,7 @@ if args.setup == "joint" and hasattr(args, 'lm_ckpt'):
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if args.setup == "joint" and hasattr(args, 'ranker_ckpt'):
-    assert hasattr(args, 'ranker_ckpt')
+if args.use_ranker:
     ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
     args.logger.info("Loading ranker from: " + ranker_param)
     args_ = Params(ranker_param)
@@ -118,22 +117,20 @@ if args.setup == "joint" and hasattr(args, 'ranker_ckpt'):
     extra_input["img"] = img
 
 # Loading checkpoints pretrained on IWSLT
-if args.setup == "joint":
-    assert hasattr(args, 'en_de_ckpt') and hasattr(args, 'fr_en_ckpt')
-    _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
-    _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
-
-    if args.cpt_iter != 0:
-        model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
-        args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
+if hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
+    if hasattr(args, 'en_de_ckpt') and args.en_de_ckpt is not None:
+        _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
         model.en_de.load_state_dict(torch.load(en_de_model, map_location))
         args.logger.info("Loading En -> De checkpoint : {}".format(en_de_model))
 
+    if hasattr(args, 'fr_en_ckpt') and args.fr_en_ckpt is not None:
+        _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
+        model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
+        args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
         if args.fix_fr2en:
             for param in list(model.fr_en.parameters()):
                 param.requires_grad = False
             args.logger.info("Fixed FR->EN agent")
-            #model.fr_en.dec.msg_len_ratio = -1.0 # make Fr->En agent predict its own length
 
 args.logger.info(str(model))
 
@@ -158,7 +155,7 @@ elif args.setup == "joint":
     from train_joint import train_model
     train_model(args, model, (train_it, dev_it), extra_input)
 
-elif args.setup == '':
+elif args.setup == 'itlearn':
     from train_iterlearn import train_model
     train_model(args, model, (train_it, dev_it), extra_input)
 

@@ -97,7 +97,6 @@ def get_hp_str(args):
                  "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\
                  "{}".format( "h{}_".format(args.h_co) ) +\
                  "{}".format( "hann{}k_".format(args.h_co_anneal_steps // 1000) if args.h_co_anneal else "" ) +\
-                 "{}".format( "aux{}_".format(args.aux_size) ) +\
                  "{}".format( "lm{}_enlm{}_".format(args.en_lm_dataset, args.en_lm_nll_co) ) +\
                  "{}".format( "ranker{}_imgpred_{}_c{}_".format(args.ranker_dataset, args.img_pred_loss, args.img_pred_loss_co) ) +\
                  "img{}_emb{}_hid{}_".format(args.D_img, args.D_emb, args.D_hid) + \

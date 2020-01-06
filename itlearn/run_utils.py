@@ -7,6 +7,8 @@ import os
 def get_model(args):
     if args.setup == "joint":
         model = Agents(args)
+    elif args.setup == 'itlearn':
+        model = Agents(args)
     elif args.setup == "single":
         model = RNNAttn(args, args.voc_sz_src, args.voc_sz_trg)
     elif args.setup == "lm":

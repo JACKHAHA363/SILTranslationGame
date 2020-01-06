@@ -115,16 +115,15 @@ class Agents(ArgsModule):
             results["neg_Hs"] = neg_Hs
         return results, rewards
 
-    def forward(self, batch, en_lm=None, all_img=None, ranker=None, reward_shape=True):
-        """ Reinforce. If reward_shape=True, use Jason's algo """
+    def forward(self, batch, en_lm=None, all_img=None, ranker=None):
+        """ Reinforce. """
         results, rewards = self.selfplay_batch(batch, en_lm, all_img, ranker)
         en_msg_len = results['new_seq_lens']
         R = rewards['ce']
-        if reward_shape:
-            if self.use_en_lm:
-                R += rewards['lm'] * self.en_lm_nll_co
-            if self.use_ranker:
-                R += rewards['img_pred'] * self.img_pred_loss_co
+        if self.train_en_lm:
+            R += rewards['lm'] * self.en_lm_nll_co
+        if self.train_ranker:
+            R += rewards['img_pred'] * self.img_pred_loss_co
 
         if not self.fix_fr2en:
             R_b = self.fr_en.dec.R_b # (batch_size, en_msg_len)
