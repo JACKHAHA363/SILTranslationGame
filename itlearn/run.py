@@ -206,14 +206,10 @@ if args.mode == 'train':
 
     elif args.setup == "ranker":
         if args.img_pred_loss == "nll":
-            #from train_captioner import train_model
-            from train_captioner_flickr30k import train_model
-            train_model(args, model)
-        #elif args.img_pred_loss == "vse":
-        #    from train_ranker import train_model
+            from train_captioner import train_model
+            train_model(args, model, (train_it, dev_it), extra_input)
         elif args.img_pred_loss in ["vse", "mse"]:
             from train_raw_ranker import train_model
-            #from train_raw_ranker_pretrained_mse import train_model
             train_model(args, model)
 
     elif args.setup == "lm":

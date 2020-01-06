@@ -122,25 +122,27 @@ def build_dataset(args, dataset):
         fields = [EN]*5
         exts = ['.1', '.2', '.3', '.4', '.5']
 
-        train = "train.bpe"
-        dev = "valid.bpe"
+        train = "captions_train2014.bpe"
+        dev = "captions_val2014.bpe"
 
-        train_data = ParallelTranslationDataset(path=data_prefix + train,
-            exts=exts, fields=fields,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+        train_data = ParallelTranslationDataset(path=os.path.join(bpe_path, 'coco', train),
+                                                exts=exts, fields=fields,
+                                                load_dataset=args.load_dataset,
+                                                save_dataset=args.save_dataset)
 
-        dev_data = ParallelTranslationDataset(path=data_prefix + dev,
-            exts=exts, fields=fields,
-            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+        dev_data = ParallelTranslationDataset(path=os.path.join(bpe_path, 'coco', dev),
+                                              exts=exts, fields=fields,
+                                              load_dataset=args.load_dataset,
+                                              save_dataset=args.save_dataset)
 
-        train_it  = Multi30kIterator(train_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True, \
-                                        sort=False, sort_within_batch=True)
-        dev_it    = Multi30kIterator(dev_data, args.batch_size, device=device, \
-                                        batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False, \
-                                        sort=False, sort_within_batch=True)
+        train_it = Multi30kIterator(train_data, args.batch_size, device=device,
+                                    batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
+                                    sort=False, sort_within_batch=True)
+        dev_it = Multi30kIterator(dev_data, args.batch_size, device=device,
+                                  batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
+                                  sort=False, sort_within_batch=True)
 
-        args.__dict__.update({"EN":EN})
+        args.__dict__.update({"EN": EN})
 
     elif dataset in ['wikitext2', 'wikitext103']:
         EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
