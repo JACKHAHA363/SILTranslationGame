@@ -110,7 +110,7 @@ def train_model(args, model):
     train_imgs = [x.strip() for x in train_imgs if x.strip() != ""]
     train_dataset.samples = [x for x in train_dataset.samples if x[0].split("/")[-1] in train_imgs]
     train_dataset.imgs = [x for x in train_dataset.imgs if x[0].split("/")[-1] in train_imgs]
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=24,
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8,
                                                pin_memory=False)
     args.logger.info("Train loader built!")
 

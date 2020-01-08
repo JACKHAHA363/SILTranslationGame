@@ -73,7 +73,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 # Loading EN LM
 extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
-if args.use_en_lm:
+if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -86,7 +86,7 @@ if args.use_en_lm:
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if args.use_ranker:
+if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_ranker:
     ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
     args.logger.info("Loading ranker from: " + ranker_param)
     args_ = Params(ranker_param)
