@@ -120,7 +120,7 @@ class ImageFolderWithPaths(_DatasetFolder):
 
     def __init__(self, root, transform=None, target_transform=None,
                  loader=default_loader, is_valid_file=None):
-        super(_DatasetFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
+        super(ImageFolderWithPaths, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                              transform=transform,
                                              target_transform=target_transform,
                                              is_valid_file=is_valid_file)

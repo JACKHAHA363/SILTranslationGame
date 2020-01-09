@@ -105,6 +105,7 @@ def train_model(args, model):
                 gpu=args.gpu, debug=args.debug)
 
     # Train dataset
+    args.logger.info("Loading train imgs...")
     train_dataset = ImageFolderWithPaths(os.path.join(args.data_dir, 'flickr30k'), preprocess_rc)
     train_imgs = open(os.path.join(args.data_dir, 'flickr30k/train.txt'), 'r').readlines()
     train_imgs = [x.strip() for x in train_imgs if x.strip() != ""]
