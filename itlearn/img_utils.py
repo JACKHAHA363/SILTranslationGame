@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torchvision.models as models
 import torchvision.datasets as datasets
+from torchvision.datasets.folder import has_file_allowed_extension, default_loader, IMG_EXTENSIONS
 from torch.autograd import Variable
 from tqdm import tqdm
 import os
@@ -74,8 +75,57 @@ preprocess_10rc = T.Compose([
 ])
 
 
-class ImageFolderWithPaths(datasets.ImageFolder):
+class _DatasetFolder(datasets.DatasetFolder):
+    def __init__(self, root, loader, extensions=None, transform=None,
+                 target_transform=None, is_valid_file=None):
+        super(datasets.DatasetFolder, self).__init__(root, transform=transform,
+                                                     target_transform=target_transform)
+        classes, class_to_idx = self._find_classes(self.root)
+        samples = self.make_dataset(class_to_idx, extensions, is_valid_file)
+        if len(samples) == 0:
+            raise (RuntimeError("Found 0 files in subfolders of: " + self.root + "\n"
+                                                                                 "Supported extensions are: " + ",".join(
+                extensions)))
+
+        self.loader = loader
+        self.extensions = extensions
+
+        self.classes = classes
+        self.class_to_idx = class_to_idx
+        self.samples = samples
+        self.targets = [s[1] for s in samples]
+
+    def make_dataset(self, class_to_idx, extensions=None, is_valid_file=None):
+        images = []
+        root = os.path.expanduser(self.root)
+        if not ((extensions is None) ^ (is_valid_file is None)):
+            raise ValueError("Both extensions and is_valid_file cannot be None or not None at the same time")
+        if extensions is not None:
+            def is_valid_file(x):
+                return has_file_allowed_extension(x, extensions)
+        for target in sorted(class_to_idx.keys()):
+            d = os.path.join(root, target)
+            if not os.path.isdir(d):
+                continue
+            for fname in sorted(os.listdir(d)):
+                path = os.path.join(d, fname)
+                if is_valid_file(path):
+                    item = (path, class_to_idx[target])
+                    images.append(item)
+        return images
+
+
+class ImageFolderWithPaths(_DatasetFolder):
     # override the __getitem__ method. this is the method dataloader calls
+
+    def __init__(self, root, transform=None, target_transform=None,
+                 loader=default_loader, is_valid_file=None):
+        super(ImageFolderWithPaths, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
+                                                   transform=transform,
+                                                   target_transform=target_transform,
+                                                   is_valid_file=is_valid_file)
+        self.imgs = self.samples
+
     def __getitem__(self, index):
         # this is what ImageFolder normally returns
         original_tuple = super(ImageFolderWithPaths, self).__getitem__(index)
