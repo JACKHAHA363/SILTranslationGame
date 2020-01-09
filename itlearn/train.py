@@ -37,6 +37,8 @@ main_path = args.exp_dir
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single', 'joint', 'itlearn']:
     folders.append('decoding')
+if args.setup in ['itlearn']:
+    folders.append('misc')
 
 for name in folders:
     folder = "{}/{}/".format(name, args.experiment) if hasattr(args, "experiment") else name + '/'

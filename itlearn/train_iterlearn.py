@@ -11,7 +11,8 @@ from utils import token_analysis, get_counts, write_tb, plot_grad, cuda, xlen_to
 from metrics import Metrics, Best
 from misc.bleu import computeBLEU, compute_bp, print_bleu
 from run_utils import get_model
-
+import matplotlib.pyplot as plt
+import os
 from pathlib import Path
 
 
@@ -201,26 +202,52 @@ def train_model(args, teacher, iterators, extra_input):
             args.logger.info('start imitating...')
             student.train()
             teacher.eval()
-            imitate(args, student, teacher, train_it)
+            imitate_statss = imitate(args, student, teacher, train_it, dev_it, monitor_names, extra_input)
             teacher.load_state_dict(student.state_dict())
+            if args.save_imitate_stats:
+                teacher_stats = get_imitate_stats(args, teacher, dev_it, monitor_names, extra_input)
+                iterss = [res[0] for res in imitate_statss]
+                statss = [res[1] for res in imitate_statss]
+                fig, axs = plt.subplots(len(teacher_stats), figsize=(7, 7*len(teacher_stats)))
+                for name, ax in zip(teacher_stats, axs.reshape(-1)):
+                    student_vals = [stats[name] for stats in statss]
+                    teacher_val = teacher_stats[name]
+                    ax.plot(iterss, student_vals, label='student')
+                    ax.plot([iterss[0], iterss[-1]], [teacher_val, teacher_val], label='teacher')
+                    ax.set_title(name)
+                    ax.legend()
+                print('Save imitation stats')
+                if not os.path.exists(os.path.join(args.misc_path, args.id_str)):
+                    os.makedirs(os.path.join(args.misc_path, args.id_str))
+                fig.savefig(os.path.join(args.misc_path, args.id_str, 'imitation_{}_stats.png'.format(iters + 1)))
+                del fig
 
 
-def imitate(args, student_models, teacher_models, train_it):
+def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_names, extra_input):
     s_model, l_model = student_models.fr_en, student_models.en_de
     s_params = [p for p in s_model.parameters() if p.requires_grad]
     s_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.s_lr)
     l_params = [p for p in l_model.parameters() if p.requires_grad]
     l_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.l_lr)
+    imitate_statss = []
     for iters, batch in enumerate(train_it):
         if iters >= args.learn_steps:
             args.logger.info('student stop learning after {} training steps'.format(args.learn_steps))
             break
+
+        if args.save_imitate_stats and iters % 10 == 0:
+            args.logger.info('Record imitate stats at {}'.format(iters))
+            student_models.eval()
+            stats = get_imitate_stats(args, student_models, dev_it, monitor_names, extra_input)
+            imitate_statss.append((iters, stats))
 
         # Teacher generate message
         with torch.no_grad():
             en_msg, de_msg, en_msg_len, de_msg_len = teacher_models.decode(batch)
             en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher_models.init_token)
             de_msg, de_msg_len = _make_sure_message_valid(de_msg, de_msg_len, teacher_models.init_token)
+
+        student_models.train()
 
         # Get fr en
         speaker_nll = _get_nll(student_models.fr_en, batch.fr[0], batch.fr[1], en_msg)
@@ -235,6 +262,8 @@ def imitate(args, student_models, teacher_models, train_it):
         listener_nll.backward()
         nn.utils.clip_grad_norm_(l_params, 0.1)
         l_opt.step()
+
+    return imitate_statss
 
 
 def _make_sure_message_valid(msg, msg_len, init_token):
@@ -257,3 +286,36 @@ def _get_nll(single_model, src, src_len, trg):
     nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
                           ignore_index=0)
     return nll
+
+
+def get_imitate_stats(args, model, dev_it, monitor_names, extra_input):
+    """ Use greedy decoding and check scores like BLEU, language model and grounding """
+    eval_metrics = Metrics('dev_loss', *monitor_names, data_type="avg")
+    eval_metrics.reset()
+    with torch.no_grad():
+        unbpe = True
+        model.eval()
+        fr_corpus, en_corpus, de_corpus = [], [], []
+        en_hyp, de_hyp = [], []
+
+        for j, dev_batch in enumerate(dev_it):
+            fr_corpus.extend(args.FR.reverse(dev_batch.fr[0], unbpe=unbpe))
+            en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
+            de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
+
+            en_msg, de_msg, en_msg_len, _ = model.decode(dev_batch)
+            en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
+            de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
+            results, _ = model.eval_fr_en_stats(en_msg, en_msg_len, dev_batch,
+                                                en_lm=extra_input["en_lm"],
+                                                all_img=extra_input["img"]['multi30k'][1],
+                                                ranker=extra_input["ranker"])
+            if len(monitor_names) > 0:
+                eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
+
+        bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
+        bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
+        stats = eval_metrics.__dict__['metrics']
+        stats['bleu_en'] = bleu_en[0]
+        stats['bleu_de'] = bleu_de[0]
+        return stats
