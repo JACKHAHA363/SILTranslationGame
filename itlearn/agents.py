@@ -187,3 +187,32 @@ class Agents(ArgsModule):
         de_msg = self.en_de.dec.multi_decode(en_hids, en_lens)
 
         return en_msgs, de_msg
+
+    def gumbel_forward(self, batch, en_lm=None, all_img=None, ranker=None):
+        results = {}
+        (fr, fr_len) = batch.fr
+        (en, en_len) = batch.en
+        (de, de_len) = batch.de
+        batch_size = len(batch)
+
+        # <BOS> removed from source Fr sentences when training Fr->En agent, hence fr_len - 1
+        fr_hid = self.fr_en.enc(fr[:, 1:], fr_len-1)
+        # Need to predict everything except <BOS>, hence en_len-1
+        send_results = self.fr_en.dec.send(fr_hid, fr_len-1, en_len-1, "gumbel", self.value_fn, self.gumbel_temp)
+        en_msg, en_msg_len = [send_results[key] for key in ["msg", "new_seq_lens"]]
+        results.update(send_results)
+
+        de_input, de_target = de[:, :-1], de[:, 1:].contiguous().view(-1)
+        de_logits, _ = self.en_de(self.fr_en.gumbel_tokens, en_msg_len, de_input) # (batch_size * en_seq_len, vocab_size)
+        de_nll = F.cross_entropy(de_logits, de_target, ignore_index=0, reduction='none')
+        results['ce_loss'] = de_nll.mean()
+        de_nll = de_nll.view(batch_size, -1).sum(dim=1) / (de_len - 1).float() # (batch_size)
+        fr_en_results, fr_en_rewards = self.eval_fr_en_stats(en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                             all_img=all_img, ranker=ranker)
+        results.update(fr_en_results)
+
+        if not (self.fr_en.dec.neg_Hs is []):
+            neg_Hs = self.fr_en.dec.neg_Hs # (batch_size, en_msg_len)
+            neg_Hs = neg_Hs.mean() # (1,)
+            results["neg_Hs"] = neg_Hs
+        return results

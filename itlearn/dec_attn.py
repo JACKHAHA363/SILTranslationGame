@@ -9,7 +9,7 @@ from torch.nn import Linear, GRU, Embedding, Module
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from utils import cuda, xlen_to_inv_mask, gumbel_softmax_hard
+from utils import cuda, xlen_to_inv_mask, gumbel_softmax
 from modules import ArgsModule
 
 
@@ -110,7 +110,7 @@ class RNNDecAttn(ArgsModule):
 
         return x
 
-    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None):
+    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None, gumbel_temp=1):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)
         # src_len : (batch_size)
         batch_size, x_seq_len = src_hid.size()[:2]
@@ -136,7 +136,7 @@ class RNNDecAttn(ArgsModule):
         max_seq_lens = cuda( torch.zeros(batch_size).fill_(y_seq_len).long() ) # (max_len)
         eos_tensor = cuda( torch.zeros(batch_size).fill_( self.eos_token )).long()
 
-        self.log_probs, self.R_b, self.neg_Hs = [], [], []
+        self.log_probs, self.R_b, self.neg_Hs, self.gumbel_tokens = [], [], [], []
         msg = []
 
         for idx in range(y_seq_len):
@@ -180,6 +180,12 @@ class RNNDecAttn(ArgsModule):
 
                 #if idx >= self.min_len_gen:
                 self.neg_Hs.append( -1 * tok_dist.entropy() )
+
+            elif send_method == "gumbel":
+                y = gumbel_softmax(logit, gumbel_temp)
+                tokens = torch.argmax(y, dim=1)
+                tokens_oh = cuda(torch.FloatTensor(y.size())).zero_().scatter_(1, tokens.data, 1)
+                self.gumbel_tokens.append((tokens_oh - y).detach() + y)
             else:
                 raise ValueError
 
@@ -200,6 +206,9 @@ class RNNDecAttn(ArgsModule):
             self.log_probs = torch.stack(self.log_probs, dim=1) # (batch_size, y_seq_len)
             self.R_b = torch.stack(self.R_b, dim=1) if value_fn else self.R_b # (batch_size, y_seq_len)
             self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
+
+        if send_method == 'gumbel':
+            self.gumbel_tokens = torch.stack(self.gumbel_tokens, dim=1)
 
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
         # NOTE en_msg_len = min( en_ref_len, whenever the model decides to output <EOS> symbol )

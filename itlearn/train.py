@@ -34,10 +34,11 @@ if not hasattr(args, 'data_dir'):
 args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
+JOINT_SETUPS = ['joint', 'itlearn', 'gumbel']
 folders = ["event", "model", "log", "param"]
-if args.setup in ['single', 'joint', 'itlearn']:
+if args.setup in ['single'] + JOINT_SETUPS:
     folders.append('decoding')
-if args.setup in ['itlearn']:
+if 'itlearn' in args.setup:
     folders.append('misc')
 
 for name in folders:
@@ -75,7 +76,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 # Loading EN LM
 extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
-if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_en_lm:
+if args.setup in JOINT_SETUPS and args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -88,7 +89,7 @@ if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_en_lm:
     extra_input["en_lm"] = en_lm
 
 #if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
-if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_ranker:
+if (args.setup in JOINT_SETUPS) and args.use_ranker:
     ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
     args.logger.info("Loading ranker from: " + ranker_param)
     args_ = Params(ranker_param)
@@ -119,7 +120,7 @@ if (args.setup == 'joint' or args.setup == 'itlearn') and args.use_ranker:
     extra_input["img"] = img
 
 # Loading checkpoints pretrained on IWSLT
-if hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
+if args.setup in JOINT_SETUPS and hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
     if hasattr(args, 'en_de_ckpt') and args.en_de_ckpt is not None:
         _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
         model.en_de.load_state_dict(torch.load(en_de_model, map_location))
@@ -172,5 +173,11 @@ elif args.setup == "ranker":
 elif args.setup == "lm":
     from train_lm import train_model
     train_model(args, model, (train_it, dev_it))
+
+elif args.setup == 'gumbel':
+    from train_gumbel import train_model
+    train_model(args, model, (train_it, dev_it), extra_input)
+else:
+    raise ValueError
 
 args.logger.info("done.")
