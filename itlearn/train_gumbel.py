@@ -151,7 +151,7 @@ def train_model(args, model, iterators, extra_input):
         opt.zero_grad()
 
         batch_size = len(train_batch)
-        R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0], ranker=extra_input["ranker"])
+        R = model.gumbel_forward(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0], ranker=extra_input["ranker"])
         losses = [R[key] for key in loss_names]
 
         total_loss = 0
