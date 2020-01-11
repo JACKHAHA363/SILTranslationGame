@@ -193,7 +193,6 @@ class Agents(ArgsModule):
         (fr, fr_len) = batch.fr
         (en, en_len) = batch.en
         (de, de_len) = batch.de
-        batch_size = len(batch)
 
         # <BOS> removed from source Fr sentences when training Fr->En agent, hence fr_len - 1
         fr_hid = self.fr_en.enc(fr[:, 1:], fr_len-1)
@@ -203,16 +202,12 @@ class Agents(ArgsModule):
         results.update(send_results)
 
         de_input, de_target = de[:, :-1], de[:, 1:].contiguous().view(-1)
-        de_logits, _ = self.en_de(self.fr_en.gumbel_tokens, en_msg_len, de_input) # (batch_size * en_seq_len, vocab_size)
+        gumbel_ids = torch.argmax(self.fr_en.dec.gumbel_tokens, dim=2)
+        assert torch.allclose(gumbel_ids, en_msg)
+        de_logits, _ = self.en_de(self.fr_en.dec.gumbel_tokens, en_msg_len, de_input) # (batch_size * en_seq_len, vocab_size)
         de_nll = F.cross_entropy(de_logits, de_target, ignore_index=0, reduction='none')
         results['ce_loss'] = de_nll.mean()
-        de_nll = de_nll.view(batch_size, -1).sum(dim=1) / (de_len - 1).float() # (batch_size)
         fr_en_results, fr_en_rewards = self.eval_fr_en_stats(en_msg, en_msg_len, batch, en_lm=en_lm,
                                                              all_img=all_img, ranker=ranker)
         results.update(fr_en_results)
-
-        if not (self.fr_en.dec.neg_Hs is []):
-            neg_Hs = self.fr_en.dec.neg_Hs # (batch_size, en_msg_len)
-            neg_Hs = neg_Hs.mean() # (1,)
-            results["neg_Hs"] = neg_Hs
         return results
