@@ -224,14 +224,14 @@ class RNNDecAttn(ArgsModule):
             # (eos_token if eos, pad_token if otherwise)
             eos_or_pad = ends_with_eos * self.pad_token + (1 - ends_with_eos) * self.eos_token
             msg = torch.cat([msg, msg.new(batch_size, 1).fill_(0)], dim=1)
-            if self.setup == 'gumbel' and len(self.gumbel_tokens) > 0:
+            if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
                 zero_gumbel_tokens = cuda(torch.zeros(msg.shape[0], 1, self.gumbel_tokens.shape[2]))
                 zero_gumbel_tokens[:, :, 0] = 1
                 self.gumbel_tokens = torch.cat([self.gumbel_tokens, zero_gumbel_tokens], dim=1)
 
             # (batch_size, y_seq_len + 1)
             msg.scatter_(dim=1, index=seq_lens[:,None], src=eos_or_pad[:,None])
-            if self.setup == 'gumbel' and len(self.gumbel_tokens) > 0:
+            if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
                 batch_ids = cuda(torch.arange(msg.shape[0]))
                 self.gumbel_tokens[batch_ids, seq_lens] = 0.
                 self.gumbel_tokens[batch_ids, seq_lens, eos_or_pad] = 1.
@@ -240,7 +240,7 @@ class RNNDecAttn(ArgsModule):
             msg_mask = xlen_to_inv_mask(seq_lens, seq_len=msg.size(1)) # (batch_size, x_seq_len)
             msg.masked_fill_(msg_mask.bool(), self.pad_token)
             result.update({"msg": msg, "new_seq_lens": seq_lens})
-            if self.setup == 'gumbel' and len(self.gumbel_tokens) > 0:
+            if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
                 batch_ids, len_ids = torch.where(msg_mask.bool())
                 zeros = cuda(torch.zeros_like(batch_ids).long())
                 self.gumbel_tokens[batch_ids, len_ids] = 0

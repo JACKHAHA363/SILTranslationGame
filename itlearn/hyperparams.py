@@ -124,6 +124,25 @@ def get_hp_str(args):
                  "ratio{}_".format( args.msg_len_ratio ) + \
                  "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
                  ""
+    elif args.setup == "gumbel_itlearn":
+        hp_str = "{}_".format(args.setup) + \
+                 "{}_".format(args.model.lower()) + \
+                 "seed{}_".format(args.seed) + \
+                 "{}".format("ce{}_".format(args.ce_co)) + \
+                 "{}".format("lm{}_enlm{}_".format(args.en_lm_dataset, args.en_lm_nll_co)) + \
+                 "{}".format("ranker{}_imgpred_{}_c{}_".format(args.ranker_dataset, args.img_pred_loss,
+                                                               args.img_pred_loss_co)) + \
+                 "{}l_".format(args.n_layers) + \
+                 "lr{:.0e}_".format(args.lr) + \
+                 "{}_".format(args.lr_anneal) + \
+                 "ann{}k_".format(args.linear_anneal_steps // 1000) + \
+                 "gtemp{}_".format(args.gumbel_temp) + \
+                 "drop{}_".format(args.drop_ratio) + \
+                 "ratio{}_".format(args.msg_len_ratio) + \
+                 "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
+                 "generation{}_learn{}_".format(args.generation_steps, args.learn_steps) + \
+                 "slr{}_llr{}_".format(args.s_lr, args.l_lr) + \
+                 ""
     elif args.setup == 'itlearn':
         hp_str = "{}_".format(args.setup) + \
                  "seed{}_".format(args.seed) + \

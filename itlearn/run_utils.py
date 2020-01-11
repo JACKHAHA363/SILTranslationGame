@@ -11,6 +11,8 @@ def get_model(args):
         model = Agents(args)
     elif args.setup == 'gumbel':
         model = Agents(args)
+    elif args.setup == 'gumbel_itlearn':
+        model = Agents(args)
     elif args.setup == "single":
         model = RNNAttn(args, args.voc_sz_src, args.voc_sz_trg)
     elif args.setup == "lm":
