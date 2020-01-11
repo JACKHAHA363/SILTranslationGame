@@ -119,6 +119,7 @@ def get_hp_str(args):
                  "lr{:.0e}_".format(args.lr) + \
                  "{}_".format(args.lr_anneal) + \
                  "ann{}k_".format(args.linear_anneal_steps // 1000) + \
+                 "gtemp{}_".format(args.gumbel_temp) + \
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format( args.msg_len_ratio ) + \
                  "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
