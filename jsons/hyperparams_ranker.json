@@ -1,0 +1,51 @@
+{
+    "experiment": "ranker",
+    "dataset": null,
+    "load_dataset": true,
+    "save_dataset": false,
+    "setup": "ranker",
+    "model": "RNN",
+
+    "gpu": 0,
+    "seed": 19920722,
+    "deterministic": false,
+
+    "tie_emb": true,
+
+    "D_emb": 300,
+    "D_hid": 1024,
+    "n_layers": 1,
+    "n_dir": 1,
+    "input_feeding": false,
+
+    "eval_every": 200,
+    "save_at": [],
+    "early_stop": false,
+    "patience": -1,
+    "batch_size": 256,
+    "drop_ratio": 0.0,
+
+    "rep_pen_co": 0.0,
+
+    "optimizer": "Adam",
+    "grad_clip": 2.0,
+    "plot_grad": false,
+    "lr": 3e-4,
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": 3000,
+    "max_training_steps": 50000,
+
+    "img_pred_loss": "vse",
+    "no_img": false,
+    "margin": 0,
+    "D_img": 2048,
+
+    "decode_method": "greedy",
+    "max_len_gen": 50,
+    "min_len_gen": 3,
+    "training_max_len": null,
+    "msg_len_ratio": -1.0,
+
+    "debug": false
+}

@@ -1,0 +1,48 @@
+{
+    "experiment": "pretrain",
+    "date": "123",
+    "dataset": "iwslt",
+    "load_dataset": true,
+    "save_dataset": false,
+
+    "setup": "single",
+    "model": "RNNAttn",
+    "pair": "en_de",
+
+    "mode": "train",
+    "gpu": 0,
+    "seed": 19920722,
+    "deterministic": false,
+
+    "tie_emb": false,
+
+    "D_emb": 256,
+    "D_hid": 256,
+    "n_layers": 1,
+    "n_dir": 1,
+    "input_feeding": true,
+
+    "eval_every": 1000,
+    "print_every": 1000,
+    "save_at": [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000],
+    "batch_size": 2000,
+    "drop_ratio": 0.3,
+
+    "optimizer": "Adam",
+    "grad_clip": 0.1,
+    "plot_grad": true,
+    "lr": 3e-4,
+    "lr_anneal": "linear",
+    "lr_min": 1e-5,
+    "linear_anneal_steps": 500000,
+    "max_training_steps": 1000000,
+
+    "decode_method": "greedy",
+    "beam_width": 5,
+    "beam_alpha": 0.6,
+    "max_len_gen": 50,
+    "training_max_len": null,
+    "msg_len_ratio": -1.0,
+
+    "debug": false
+}
