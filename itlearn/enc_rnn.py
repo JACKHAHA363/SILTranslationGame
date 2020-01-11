@@ -36,14 +36,20 @@ class RNNEnc(ArgsModule):
 
     def forward(self, x, x_len, h_0=None):
         # NOTE x_len.max() == x.size(1)
-        # x : (batch_size, x_seq_len)
+        # x : (batch_size, x_seq_len) or (batcg_size, x_seq_len, vocab_size)
         # x_len : (batch_size)
         batch_size, x_seq_len = x.size()[:2] # NOTE dim==3 for gumbel softmax
 
         if h_0 is None:
-            h_0 = cuda( torch.FloatTensor(self.n_layers * self.n_dir, \
-                                                batch_size, self.D_hid).zero_() )
-        input = self.emb( x )
+            h_0 = cuda(torch.FloatTensor(self.n_layers * self.n_dir,
+                                         batch_size, self.D_hid).zero_())
+        if len(x.shape) == 2:
+            input = self.emb(x)
+        elif len(x.shape) == 3:
+            # Gumbel
+            input = torch.matmul(x, self.emb.weight)
+        else:
+            raise ValueError
         input = F.dropout( input, p=self.drop_ratio, training=self.training )
 
         # input (batch_size, x_seq_len, D_emb)
