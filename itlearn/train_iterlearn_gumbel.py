@@ -1,4 +1,3 @@
-import ipdb
 import math
 
 import numpy as np
@@ -190,7 +189,6 @@ def train_model(args, teacher, iterators, extra_input):
             student.train()
             teacher.eval()
             imitate_statss = imitate(args, student, teacher, train_it, dev_it, monitor_names, extra_input)
-            teacher.load_state_dict(student.state_dict())
             if args.save_imitate_stats:
                 teacher_stats = get_imitate_stats(args, teacher, dev_it, monitor_names, extra_input)
                 iterss = [res[0] for res in imitate_statss]
@@ -208,6 +206,9 @@ def train_model(args, teacher, iterators, extra_input):
                     os.makedirs(os.path.join(args.misc_path, args.id_str))
                 fig.savefig(os.path.join(args.misc_path, args.id_str, 'imitation_{}_stats.png'.format(iters + 1)))
                 del fig
+
+            # Replace teacher with the learned students
+            teacher.load_state_dict(student.state_dict())
 
 
 def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_names, extra_input):
@@ -237,14 +238,16 @@ def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_name
         student_models.train()
 
         # Get fr en
-        speaker_nll = _get_nll(student_models.fr_en, batch.fr[0], batch.fr[1], en_msg)
+        speaker_nll = _get_imitate_loss(args, student_models.fr_en, teacher_models.fr_en,
+                                        batch.fr[0], batch.fr[1], en_msg)
         s_opt.zero_grad()
         speaker_nll.backward()
         nn.utils.clip_grad_norm_(s_params, 0.1)
         s_opt.step()
 
         # Get en de
-        listener_nll = _get_nll(student_models.en_de, en_msg, en_msg_len, de_msg)
+        listener_nll = _get_imitate_loss(args, student_models.en_de, teacher_models.en_de,
+                                         en_msg, en_msg_len, de_msg)
         l_opt.zero_grad()
         listener_nll.backward()
         nn.utils.clip_grad_norm_(l_params, 0.1)
@@ -259,20 +262,35 @@ def _make_sure_message_valid(msg, msg_len, init_token):
                     dim=1)
     msg_len += 1
 
-    # Make sure padding are all zeros
-    inv_mask = xlen_to_inv_mask(msg_len, seq_len=msg.shape[1])
-    msg.masked_fill_(mask=inv_mask.bool(), value=0)
+    # Make sure padding are all zeros (Not necessary any more. Already inside send)
+    #inv_mask = xlen_to_inv_mask(msg_len, seq_len=msg.shape[1])
+    #msg.masked_fill_(mask=inv_mask.bool(), value=0)
     return msg, msg_len
 
 
-def _get_nll(single_model, src, src_len, trg):
+def _get_imitate_loss(args, student_model, teacher_model, src, src_len, trg):
     """ Single model get NLL loss"""
     # NOTE encoder never receives <BOS> token
     # because during communication, Agent A's decoder will never output <BOS>
-    logits, _ = single_model(src[:, 1:], src_len - 1, trg[:, :-1])
-    nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
-                          ignore_index=0)
-    return nll
+    student_logits, _ = student_model(src[:, 1:], src_len - 1, trg[:, :-1])
+
+    # Loss is just nll
+    if args.distill_temp == 0:
+        loss = F.cross_entropy(student_logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
+                               ignore_index=0)
+
+    # min KL(teacher | student) = p_teacher (log p - log q)
+    else:
+        with torch.no_grad():
+            teacher_logits, _ = teacher_model(src[:, 1:], src_len - 1, trg[:, :-1])
+        teacher_probs = torch.nn.functional.softmax(teacher_logits, dim=-1)
+        student_logprobs = torch.nn.functional.log_softmax(student_logits, dim=-1)
+        kl = teacher_probs * (torch.log(teacher_probs) - student_logprobs)
+        kl = kl.sum(-1) # [bsz, trg_len - 1]
+        inv_mask = (trg[:, 1:] == 0).view(-1)
+        kl.masked_fill_(inv_mask, 0)
+        loss = kl.sum() / inv_mask.logical_not().sum()
+    return loss
 
 
 def get_imitate_stats(args, model, dev_it, monitor_names, extra_input):
