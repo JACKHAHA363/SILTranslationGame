@@ -140,7 +140,7 @@ def get_hp_str(args):
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format(args.msg_len_ratio) + \
                  "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
-                 "generation{}_learn{}_".format(args.generation_steps, args.learn_steps) + \
+                 "generation{}_learn{}_temp{}_".format(args.generation_steps, args.learn_steps, args.distill_temp) + \
                  "slr{}_llr{}_".format(args.s_lr, args.l_lr) + \
                  ""
     elif args.setup == 'itlearn':
