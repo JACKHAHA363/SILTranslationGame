@@ -1,0 +1,41 @@
+-f /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/avx2
+-f /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+backcall==0.1.0
+certifi==2019.11.28
+chardet==3.0.4
+cycler==0.10.0
+decorator==4.4.1
+idna==2.8
+ipdb==0.11
+ipython==7.11.1
+ipython-genutils==0.2.0
+# Editable install with no version control (iterlearn==0.0.0)
+-e /scratch/luyuchen/translation_game/code
+jedi==0.15.2
+kiwisolver==1.1.0
+matplotlib==3.1.1
+nltk==3.4
+numpy==1.17.4
+parso==0.5.2
+pexpect==4.7.0
+pickleshare==0.7.5
+Pillow==6.2.1
+prompt-toolkit==3.0.2
+protobuf==3.11.2
+ptyprocess==0.6.0
+Pygments==2.5.2
+pyparsing==2.4.6
+python-dateutil==2.8.1
+requests==2.22.0
+revtok==0.0.3
+singledispatch==3.4.0.3
+six==1.13.0
+tensorboardX==2.0
+torch==1.2.0
+torch-gpu==1.0.0
+torchtext==0.4.0
+torchvision==0.4.0
+tqdm==4.41.1
+traitlets==4.3.3
+urllib3==1.25.7
+wcwidth==0.1.7
