@@ -1,7 +1,7 @@
 {
-    "experiment": "gumbel",
-    "setup": "gumbel",
-    "gumbel_temp": 0.1,
+    "experiment": "gumbel_itlearn",
+    "setup": "gumbel_itlearn",
+    "gumbel_temp": 0.5,
 
     "en_de_ckpt": "123_pretrain/12.29_20.21._single_rnnattn_en_de_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.3_clip0.1_",
     "fr_en_ckpt": "123_pretrain/12.29_20.23._single_rnnattn_fr_en_emb256_hid256_1l_lr3e-04_linear_ann500k_drop0.2_clip0.1_",
@@ -66,5 +66,12 @@
 
     "debug": false,
     "plot_grad": false,
-    "early_stop": false
+    "early_stop": false,
+    
+    "save_imitate_stats": true,
+    "generation_steps": 300,
+    "learn_steps": 500,
+    "s_lr": 1e-4,
+    "l_lr": 1e-4,
+    "distill_temp": 1
 }
