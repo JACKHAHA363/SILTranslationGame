@@ -36,7 +36,7 @@ def main():
         sweep_json = json.load(f)
     all_keys = list(sweep_json.keys())
     sweep_keys = [k for k in all_keys if isinstance(sweep_json[k], list) and k not in EXCLUDES]
-    non_sweep_keys = [k for k in all_keys if k not in sweep_keys]
+    non_sweep_keys = [k for k in all_keys if k not in sweep_keys and k not in EXCLUDES]
     print('Sweeping ', sweep_keys)
 
     # Command with fixed args
