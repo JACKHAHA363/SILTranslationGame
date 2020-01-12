@@ -12,7 +12,7 @@ from subprocess import call
 PROJ_PATH = os.path.dirname(itlearn.__file__)
 SCRIPT_PATH = os.path.join(PROJ_PATH, 'train.py')
 PYBIN = sys.executable
-SLURM_FILE = os.path.join(os.path.dirname(PROJ_PATH), 'scripts', 'run_graham.sh')
+SLURM_FILE = os.path.join(os.path.dirname(PROJ_PATH), 'scripts', 'run_cc.sh')
 print('train_script', SCRIPT_PATH)
 print('python bin', PYBIN)
 print('slurm run file', SLURM_FILE)
