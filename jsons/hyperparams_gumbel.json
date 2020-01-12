@@ -46,7 +46,6 @@
     "h_co_anneal": false,
 
     "eval_every": 500,
-    "save_at": [],
     "batch_size": 1024,
     "drop_ratio": 0.0,
 
