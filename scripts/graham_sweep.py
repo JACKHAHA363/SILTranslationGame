@@ -4,9 +4,20 @@ Do Grid Search
 import argparse
 import json
 from itertools import product
+import itlearn
+import os
+import sys
 
-PYBIN = ""
-SCRIPT_PATH = ""
+PROJ_PATH = os.path.dirname(itlearn.__file__)
+SCRIPT_PATH = os.path.join(PROJ_PATH, 'train.py')
+PYBIN = sys.executable
+SLURM_FILE = os.path.join(os.path.dirname(PROJ_PATH), 'scripts', 'run_graham.sh')
+print('train_script', SCRIPT_PATH)
+print('python bin', PYBIN)
+print('slurm run file', SLURM_FILE)
+
+SLURM_OPTION = ['sbatch', SLURM_FILE]
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -37,7 +48,7 @@ def main():
         non_fixed = []
         for k, val in zip(sweep_keys, sweep_args):
             non_fixed += ['--{}'.format(k), str(val)]
-        final_cmd = cmd + non_fixed
+        final_cmd = SLURM_OPTION + cmd + non_fixed
         print(final_cmd)
 
 
