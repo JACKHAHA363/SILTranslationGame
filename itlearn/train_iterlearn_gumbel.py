@@ -216,7 +216,7 @@ def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_name
     s_params = [p for p in s_model.parameters() if p.requires_grad]
     s_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.s_lr)
     l_params = [p for p in l_model.parameters() if p.requires_grad]
-    l_opt = torch.optim.Adam(s_params, betas=(0.9, 0.98), eps=1e-9, lr=args.l_lr)
+    l_opt = torch.optim.Adam(l_params, betas=(0.9, 0.98), eps=1e-9, lr=args.l_lr)
     imitate_statss = []
     for iters, batch in enumerate(train_it):
         if iters >= args.learn_steps:
