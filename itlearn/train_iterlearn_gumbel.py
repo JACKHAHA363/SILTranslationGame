@@ -61,8 +61,8 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
     with torch.no_grad():
         model.eval()
         for j, dev_batch in enumerate(dev_it):
-            R = model.gumbel_forward(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
-                                     ranker=extra_input["ranker"])
+            R = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
+                      ranker=extra_input["ranker"])
             losses = [R[key] for key in loss_names]
             dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
                                    *[R[k].item() for k in monitor_names])
@@ -88,8 +88,8 @@ def selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor
         loss_cos['neg_Hs'] = get_h_co_anneal(args, iters)
     opt.zero_grad()
     batch_size = len(train_batch)
-    R = model.gumbel_forward(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0],
-                             ranker=extra_input["ranker"])
+    R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0],
+              ranker=extra_input["ranker"])
     losses = [R[key] for key in loss_names]
     total_loss = 0
     for loss_name, loss in zip(loss_names, losses):
