@@ -155,8 +155,8 @@ if args.setup == "single":
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "joint":
-    from train_joint import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
+    from train_joint import train_a2c_model
+    train_a2c_model(args, model, (train_it, dev_it), extra_input)
 
 elif args.setup == 'itlearn':
     from train_iterlearn import train_model
@@ -175,8 +175,8 @@ elif args.setup == "lm":
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == 'gumbel':
-    from train_gumbel import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
+    from train_joint import train_gumbel_model
+    train_gumbel_model(args, model, (train_it, dev_it), extra_input)
 elif args.setup == 'gumbel_itlearn':
     from train_iterlearn_gumbel import train_model
     train_model(args, model, (train_it, dev_it), extra_input)
