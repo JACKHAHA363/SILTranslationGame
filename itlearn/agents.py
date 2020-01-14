@@ -90,7 +90,7 @@ class AgentsA2C(BaseAgents):
         rewards = {}
 
         # Speak fr en first
-        en_msg, en_msg_len = self.fr_en_speak(batch)
+        en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
         fr_en_results, fr_en_rewards = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
                                                         all_img=all_img, ranker=ranker)
         results.update(fr_en_results)
@@ -156,7 +156,7 @@ class AgentsGumbel(BaseAgents):
     def forward(self, batch, en_lm=None, all_img=None, ranker=None):
         """ Create training graph """
         results = {}
-        en_msg, en_msg_len = self.fr_en_speak(batch)
+        en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
         fr_en_results, _ = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
                                             all_img=all_img, ranker=ranker)
         results.update(fr_en_results)
@@ -166,4 +166,9 @@ class AgentsGumbel(BaseAgents):
         de_logits, _ = self.en_de(self.fr_en.dec.gumbel_tokens, en_msg_len, de_input) # (batch_size * en_seq_len, vocab_size)
         de_nll = F.cross_entropy(de_logits, de_target, ignore_index=0, reduction='none')
         results['ce_loss'] = de_nll.mean()
+
+        # Get entropy
+        neg_Hs = self.fr_en.dec.neg_Hs  # (batch_size, en_msg_len)
+        neg_Hs = neg_Hs.mean()  # (1,)
+        results["neg_Hs"] = neg_Hs
         return results

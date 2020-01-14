@@ -4,6 +4,8 @@ from pathlib import Path
 from metrics import Metrics, Best
 from utils import write_tb, plot_grad
 from agents_utils import eval_model, valid_model
+import math
+import numpy as np
 
 
 def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names, monitor_names):
@@ -29,7 +31,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
             break
 
-        if not args.debug and iters in args.save_at:
+        if not args.debug and hasattr(args, 'save_at') and iters in args.save_at:
             args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
             with torch.cuda.device(args.gpu):
                 torch.save(model.state_dict(), '{}_iter={}.pt'.format(args.model_path + args.id_str, iters))
@@ -94,7 +96,10 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             plot_grad(writer, model, iters)
 
         if args.grad_clip > 0:
-            nn.utils.clip_grad_norm_(params, args.grad_clip)
+            total_norm = nn.utils.clip_grad_norm_(params, args.grad_clip)
+            if total_norm != total_norm or math.isnan(total_norm) or np.isnan(total_norm):
+                print('NAN!!!!!!!!!!!!!!!!!!!!!!')
+                exit()
         opt.step()
 
         if iters % args.eval_every == 0:
@@ -106,41 +111,4 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             write_tb(writer, monitor_names, [train_metrics.__getattr__(name) for name in monitor_names],
                      iters, prefix="train/")
             write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
-            if not args.fix_fr2en:
-                write_tb(writer, ["h_co"], [loss_cos['neg_Hs']], iters, prefix="train/")
             train_metrics.reset()
-
-
-def train_a2c_model(args, model, iterators, extra_input):
-    (train_it, dev_it) = iterators
-    monitor_names = []
-    loss_names = ['ce_loss']
-    loss_cos = {"ce_loss": args.ce_co}
-    if not args.fix_fr2en:
-        loss_names.extend(['pg_loss', 'b_loss'])
-        loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co} )
-
-        if args.h_co > 0:
-            loss_names.append('neg_Hs')
-        else:
-            monitor_names.append('neg_Hs')
-        loss_cos['neg_Hs'] = args.h_co
-
-    if args.use_ranker:
-        monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
-    if args.use_en_lm:
-        monitor_names.append('en_nll_lm')
-    joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names, monitor_names)
-
-
-def train_gumbel_model(args, model, iterators, extra_input):
-    (train_it, dev_it) = iterators
-    monitor_names = []
-    loss_names = ['ce_loss']
-    loss_cos = {"ce_loss": args.ce_co}
-
-    if args.use_ranker:
-        monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
-    if args.use_en_lm:
-        monitor_names.append('en_nll_lm')
-    joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names, monitor_names)

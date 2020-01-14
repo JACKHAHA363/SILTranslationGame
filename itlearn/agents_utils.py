@@ -2,9 +2,9 @@ from pathlib import Path
 
 import torch
 
-from metrics import Metrics, Best
+from metrics import Metrics
 from misc.bleu import computeBLEU, print_bleu
-from utils import cuda, sum_reward, write_tb, plot_grad
+from utils import cuda, sum_reward
 
 
 def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None):
@@ -66,10 +66,10 @@ def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
             en_msg, de_msg, en_msg_len, _ = model.decode(dev_batch)
             en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
             de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
-            results, _ = model.eval_fr_en_stats(en_msg, en_msg_len, dev_batch,
-                                                en_lm=extra_input["en_lm"],
-                                                all_img=extra_input["img"]['multi30k'][1],
-                                                ranker=extra_input["ranker"])
+            results, _ = eval_fr_en_stats(model, en_msg, en_msg_len, dev_batch,
+                                          en_lm=extra_input["en_lm"],
+                                          all_img=extra_input["img"]['multi30k'][1],
+                                          ranker=extra_input["ranker"])
             if len(monitor_names) > 0:
                 eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
 
@@ -100,3 +100,37 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
             dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
                                    *[R[k].item() for k in monitor_names])
     return dev_metrics
+
+
+def _base_train(args, model, iterators, extra_input, loop, is_a2c=False):
+    (train_it, dev_it) = iterators
+    monitor_names = []
+    loss_names = ['ce_loss']
+    loss_cos = {"ce_loss": args.ce_co}
+
+    # Extra loss for a2c
+    if is_a2c:
+        loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
+        loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
+
+    # Monitor the entropy of gumbel but don't train
+    else:
+        args.logger.info("Don't train entropy but observe it")
+        loss_names.extend(['neg_Hs'])
+        loss_cos.update({'neg_Hs': 0.})
+
+    if args.use_ranker:
+        monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
+    if args.use_en_lm:
+        monitor_names.append('en_nll_lm')
+    loop(args=args, model=model, train_it=train_it, dev_it=dev_it,
+         extra_input=extra_input, loss_cos=loss_cos, loss_names=loss_names,
+         monitor_names=monitor_names)
+
+
+def train_a2c_model(args, model, iterators, extra_input, loop):
+    return _base_train(args, model, iterators, extra_input, loop, is_a2c=True)
+
+
+def train_gumbel_model(args, model, iterators, extra_input, loop):
+    return _base_train(args, model, iterators, extra_input, loop, is_a2c=False)
