@@ -242,7 +242,7 @@ def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_name
                                         batch.fr[0], batch.fr[1], en_msg)
         s_opt.zero_grad()
         speaker_nll.backward()
-        nn.utils.clip_grad_norm_(s_params, 0.1)
+        #nn.utils.clip_grad_norm_(s_params, 0.1)
         s_opt.step()
 
         # Get en de
@@ -250,7 +250,7 @@ def imitate(args, student_models, teacher_models, train_it, dev_it, monitor_name
                                          en_msg, en_msg_len, de_msg)
         l_opt.zero_grad()
         listener_nll.backward()
-        nn.utils.clip_grad_norm_(l_params, 0.1)
+        #nn.utils.clip_grad_norm_(l_params, 0.1)
         l_opt.step()
 
     return imitate_statss
@@ -283,7 +283,7 @@ def _get_imitate_loss(args, student_model, teacher_model, src, src_len, trg):
     else:
         with torch.no_grad():
             teacher_logits, _ = teacher_model(src[:, 1:], src_len - 1, trg[:, :-1])
-        teacher_probs = torch.nn.functional.softmax(teacher_logits, dim=-1)
+        teacher_probs = torch.nn.functional.softmax(teacher_logits / args.distill_temp, dim=-1)
         student_logprobs = torch.nn.functional.log_softmax(student_logits, dim=-1)
         kl = teacher_probs * (torch.log(teacher_probs) - student_logprobs)
         kl = kl.sum(-1) # [bsz, trg_len - 1]
