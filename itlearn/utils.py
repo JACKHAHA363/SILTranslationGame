@@ -163,7 +163,8 @@ def sample_gumbel(shape, eps=1e-20):
     return -torch.log(-torch.log(U + eps) + eps)
 
 def gumbel_softmax(logits, temp):
-    y = ( logits + sample_gumbel(logits.size()) ) / temp
+    logprobs = torch.log_softmax(logits, dim=1)
+    y = (logprobs + sample_gumbel(logits.size())) / temp
     return F.softmax(y, dim=1)
 
 def gumbel_softmax_hard(logits, temp, st):

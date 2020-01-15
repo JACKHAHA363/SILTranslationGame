@@ -1,18 +1,18 @@
 from agent import RNNAttn, RNNLM, ImageCaptioning, ImageGrounding
-from agents import Agents
+from agents import AgentsA2C, AgentsGumbel
 from data import build_dataset
 import os
 
 
 def get_model(args):
     if args.setup == "joint":
-        model = Agents(args)
+        model = AgentsA2C(args)
     elif args.setup == 'itlearn':
-        model = Agents(args)
+        model = AgentsA2C(args)
     elif args.setup == 'gumbel':
-        model = Agents(args)
+        model = AgentsGumbel(args)
     elif args.setup == 'gumbel_itlearn':
-        model = Agents(args)
+        model = AgentsGumbel(args)
     elif args.setup == "single":
         model = RNNAttn(args, args.voc_sz_src, args.voc_sz_trg)
     elif args.setup == "lm":

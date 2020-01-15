@@ -176,13 +176,15 @@ class RNNDecAttn(ArgsModule):
             elif send_method == "reinforce":
                 tok_dist = Categorical(logits=logit)
                 tokens = tok_dist.sample()
-                self.log_probs.append( tok_dist.log_prob(tokens) ) # (batch_size)
+                self.log_probs.append(tok_dist.log_prob(tokens)) # (batch_size)
 
                 #if idx >= self.min_len_gen:
-                self.neg_Hs.append( -1 * tok_dist.entropy() )
+                self.neg_Hs.append(-1 * tok_dist.entropy())
 
             elif send_method == "gumbel":
                 y = gumbel_softmax(logit, gumbel_temp)
+                tok_dist = Categorical(probs=y)
+                self.neg_Hs.append(-1 * tok_dist.entropy())
                 tokens = torch.argmax(y, dim=1)
                 tokens_oh = cuda(torch.zeros(y.size())).scatter_(1, tokens.unsqueeze(-1), 1)
                 self.gumbel_tokens.append((tokens_oh - y).detach() + y)
@@ -209,6 +211,7 @@ class RNNDecAttn(ArgsModule):
 
         if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
             self.gumbel_tokens = torch.stack(self.gumbel_tokens, dim=1)
+            self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
         # NOTE en_msg_len = min( en_ref_len, whenever the model decides to output <EOS> symbol )

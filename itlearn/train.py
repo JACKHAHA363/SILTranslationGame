@@ -154,14 +154,6 @@ if args.setup == "single":
     from train_single import train_model
     train_model(args, model, (train_it, dev_it))
 
-elif args.setup == "joint":
-    from train_joint import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
-
-elif args.setup == 'itlearn':
-    from train_iterlearn import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
-
 elif args.setup == "ranker":
     if args.img_pred_loss == "nll":
         from train_captioner import train_model
@@ -174,12 +166,25 @@ elif args.setup == "lm":
     from train_lm import train_model
     train_model(args, model, (train_it, dev_it))
 
+elif args.setup == "joint":
+    from agents_utils import train_a2c_model
+    from train_joint import joint_loop
+    train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
+
+elif args.setup == 'itlearn':
+    from agents_utils import train_a2c_model
+    from train_iterlearn import itlearn_loop
+    train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
+
 elif args.setup == 'gumbel':
-    from train_gumbel import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
+    from agents_utils import train_gumbel_model
+    from train_joint import joint_loop
+    train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
+
 elif args.setup == 'gumbel_itlearn':
-    from train_iterlearn_gumbel import train_model
-    train_model(args, model, (train_it, dev_it), extra_input)
+    from agents_utils import train_gumbel_model
+    from train_iterlearn import itlearn_loop
+    train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 else:
     raise ValueError
 
