@@ -126,13 +126,12 @@ def get_hp_str(args):
                  ""
     elif args.setup == "gumbel_itlearn":
         hp_str = "lr{:.0e}_".format(args.lr) + \
-                 "{}_".format(args.lr_anneal) + \
-                 "ann{}k_".format(args.linear_anneal_steps // 1000) + \
                  "gtemp{}_".format(args.gumbel_temp) + \
-                 "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format(args.msg_len_ratio) + \
-                 "generation{}_learn{}_temp{}_".format(args.generation_steps, args.learn_steps, args.distill_temp) + \
-                 "slr{}_llr{}_".format(args.s_lr, args.l_lr) + \
+                 "k1{}_".format(args.k1) + \
+                 "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
+                 "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \
+                 "sameopt_{}_".format(args.same_opt) + \
                  ""
     elif args.setup == 'itlearn':
         hp_str = "{}_".format(args.setup) + \

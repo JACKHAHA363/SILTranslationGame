@@ -85,6 +85,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     student.load_state_dict(model.state_dict())
     if torch.cuda.is_available() and args.gpu > -1:
         student.cuda(args.gpu)
+    stu_fr_en_opt, stu_en_de_opt = None, None
     for iters, train_batch in enumerate(train_it):
         if iters >= args.max_training_steps:
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
@@ -125,18 +126,18 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
                       train_metrics, writer)
 
-        if (iters + 1) % args.generation_steps == 0:
+        if (iters + 1) % args.k1 == 0:
             args.logger.info('start imitating...')
             student.train()
             model.eval()
-
+            stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
             fr_en_statss = imitate_fr_en(args, student=student,
                                          teacher=model, train_it=train_it,
                                          dev_it=dev_it, monitor_names=monitor_names,
-                                         extra_input=extra_input, opt=None)
+                                         extra_input=extra_input, opt=stu_fr_en_opt)
             en_de_statss = imitate_en_de(args, student=student,
                                          teacher=model, train_it=train_it, dev_it=dev_it,
-                                         opt=None)
+                                         opt=stu_en_de_opt)
             if args.save_imitate_stats:
                 print('Save imitation stats')
                 if not os.path.exists(os.path.join(args.misc_path, args.id_str)):
@@ -168,3 +169,19 @@ def plot_imitate_stats(teacher_stats, imitate_statss):
         ax.set_title(name)
         ax.legend()
     return fig
+
+
+def get_student_opts(args, student, student_opts=None):
+    # Same opt
+    if args.same_opt and student_opts is not None:
+        args.logger.info('Reuse optimizer!')
+        return student_opts
+
+    # Create
+    else:
+        args.logger.info('Create new optimizer')
+        fr_en_opt = torch.optim.Adam(student.fr_en.parameters(), betas=(0.9, 0.98),
+                                     eps=1e-9, lr=args.fr_en_lr)
+        en_de_opt = torch.optim.Adam(student.en_de.parameters(), betas=(0.9, 0.98),
+                                     eps=1e-9, lr=args.en_de_lr)
+        return fr_en_opt, en_de_opt
