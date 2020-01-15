@@ -17,16 +17,16 @@ def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, 
     if args.use_en_lm:  # monitor EN LM NLL
         if "wiki" in args.en_lm_dataset:
             en_nll_lm = en_lm.get_nll(en_msg_)  # (batch_size, en_msg_len)
-            en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
             if args.train_en_lm:
+                en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
                 # R = R + -1 * en_nll_lm.detach() * self.en_lm_nll_co # (batch_size)
             results.update({"en_nll_lm": en_nll_lm.mean()})
 
         elif args.en_lm_dataset in ["coco", "multi30k"]:
             en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
-            en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
             if args.train_en_lm:
+                en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
             results.update({"en_nll_lm": en_nll_lm.mean()})
         else:

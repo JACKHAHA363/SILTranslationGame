@@ -161,7 +161,8 @@ def plot_imitate_stats(teacher_stats, imitate_statss):
     iterss = [res[0] for res in imitate_statss]
     statss = [res[1] for res in imitate_statss]
     fig, axs = plt.subplots(len(teacher_stats), figsize=(7, 7 * len(teacher_stats)))
-    for name, ax in zip(teacher_stats, axs.reshape(-1)):
+    axs = axs.reshape(-1) if len(teacher_stats) > 1 else [axs]
+    for name, ax in zip(teacher_stats, axs):
         student_vals = [stats[name] for stats in statss]
         teacher_val = teacher_stats[name]
         ax.plot(iterss, student_vals, label='student')

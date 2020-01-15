@@ -127,11 +127,11 @@ def get_hp_str(args):
     elif args.setup == "gumbel_itlearn":
         hp_str = "lr{:.0e}_".format(args.lr) + \
                  "gtemp{}_".format(args.gumbel_temp) + \
-                 "ratio{}_".format(args.msg_len_ratio) + \
+                 "lenratio{}_".format(args.msg_len_ratio) + \
+                 "sameopt_{}_finetune{}_".format(args.same_opt, args.en_de_finetune) + \
                  "k1{}_".format(args.k1) + \
                  "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
                  "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \
-                 "sameopt_{}_".format(args.same_opt) + \
                  ""
     elif args.setup == 'itlearn':
         hp_str = "{}_".format(args.setup) + \

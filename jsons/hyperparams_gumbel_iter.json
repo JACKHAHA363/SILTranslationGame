@@ -70,6 +70,7 @@
     
     "save_imitate_stats": true,
     "same_opt": false,
+    "en_de_finetune": false,
     "k1": 300,
     "fr_en_k2": 500,
     "fr_en_temp": 1,

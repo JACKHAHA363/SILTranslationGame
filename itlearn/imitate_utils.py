@@ -12,6 +12,7 @@ __all__ = ['imitate_fr_en', 'imitate_en_de',
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):
     """ Imitate speake """
+    args.logger.info('Imitate fr en!')
     imitate_statss = []
     for iters, batch in enumerate(train_it):
         if iters >= args.fr_en_k2:
@@ -66,6 +67,10 @@ def get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input):
 
 
 def imitate_en_de(args, student, teacher, train_it, dev_it, opt):
+    if not args.en_de_finetune:
+        args.logger.info('Imitate fr en!')
+    else:
+        args.logger.info('Finetune en de')
     imitate_statss = []
     for iters, batch in enumerate(train_it):
         if iters >= args.en_de_k2:

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from utils import cuda, gumbel_softmax, gumbel_softmax_hard
+from utils import cuda
 from modules import ArgsModule
 
 class RNNDec(ArgsModule):
