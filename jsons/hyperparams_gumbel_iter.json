@@ -69,9 +69,13 @@
     "early_stop": false,
     
     "save_imitate_stats": true,
-    "generation_steps": 300,
-    "learn_steps": 500,
-    "s_lr": 1e-4,
-    "l_lr": 1e-4,
-    "distill_temp": 1
+    "same_opt": false,
+    "en_de_finetune": false,
+    "k1": 300,
+    "fr_en_k2": 500,
+    "fr_en_temp": 1,
+    "fr_en_lr": 1e-4,
+    "en_de_k2": 500,
+    "en_de_temp": 1,
+    "en_de_lr": 1e-4
 }

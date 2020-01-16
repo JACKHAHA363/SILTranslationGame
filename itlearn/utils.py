@@ -138,29 +138,25 @@ def get_nll_lm_char(model, en_msg, word2idx, idx2word, nhid=800):
         nll = nll.sum(dim=-1) / num_chars # (batch_size)
         return nll
 
-def xlen_to_mask(x_len):
-    # x_len : (batch_size)
-    batch_size, seq_len = x_len.size()[0], x_len.max()
-
-    mask = torch.full((batch_size, seq_len), 0).byte()
-    for idx in range(batch_size):
-        mask[idx][:x_len[idx]] = 1
-    return cuda(mask)
-
 def xlen_to_inv_mask(x_len, seq_len=None):
-    # x_len : (batch_size)
-    batch_size = x_len.size()[0]
+    """ 1 if out of length. 0 if inside length """
     if seq_len is None:
         seq_len = x_len.max()
+    mask = torch.arange(seq_len)[None, :]
+    mask = mask.to(device=x_len.device)
+    return mask >= x_len[:, None]
 
-    mask = torch.full((batch_size, seq_len), 1).byte()
-    for idx in range(batch_size):
-        mask[idx][:x_len[idx]] = 0
-    return cuda(mask)
 
-def sample_gumbel(shape, eps=1e-20):
-    U = cuda( torch.FloatTensor(shape).uniform_(0, 1) )
-    return -torch.log(-torch.log(U + eps) + eps)
+loc = torch.tensor(0.)
+scale = torch.tensor(1.)
+if torch.cuda.is_available():
+    GUMBEL_DIST = torch.distributions.Gumbel(loc=loc.cuda(), scale=scale.cuda())
+else:
+    GUMBEL_DIST = torch.distributions.Gumbel(loc=loc, scale=scale)
+
+
+def sample_gumbel(shape):
+    return GUMBEL_DIST.sample(shape)
 
 def gumbel_softmax(logits, temp):
     logprobs = torch.log_softmax(logits, dim=1)
@@ -208,8 +204,8 @@ def normf(t, p=2, d=1):
 def sum_reward(reward, lens):
     # reward: (batch_size, seq_len)
     # lens : (batch_size)
-    mask = xlen_to_inv_mask(lens, reward.size(1))
-    reward.masked_fill_(mask.bool(), 0)
+    #mask = xlen_to_inv_mask(lens, reward.size(1))
+    #reward.masked_fill_(mask.bool(), 0)
     reward = reward.sum(dim=-1) / lens.float() # (batch_size)
     return reward
 

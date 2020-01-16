@@ -6,14 +6,12 @@ import os
 import torch.nn as nn
 from torch.nn import Linear, GRU, Embedding, Module
 import torch.nn.functional as F
-from torch.distributions import Categorical
-import numpy as np
 
-from enc_rnn import RNNEnc, take_last
+from enc_rnn import RNNEnc
 from dec_rnn import RNNDec
 from dec_attn import RNNDecAttn
 
-from utils import cuda, gumbel_softmax, gumbel_softmax_hard, xlen_to_mask, xlen_to_inv_mask, get_counts, get_dist_idx, normf, sum_reward
+from utils import cuda, normf
 from modules import ArgsModule
 
 SMALL = 1e-10
@@ -69,7 +67,7 @@ class ImageGrounding(ArgsModule):
         #self.rnn = nn.LSTM(args.D_emb, args.D_hid, args.n_layers, dropout=args.drop_ratio,
         #                   batch_first=True, bidirectional=True)
         self.rnn = nn.GRU(args.D_emb, args.D_hid, args.n_layers, dropout=args.drop_ratio,
-                           batch_first=True)
+                          batch_first=True)
         if args.img_pred_loss == "vse":
             self.img_enc = Linear(args.D_img, args.D_hid)
         elif args.img_pred_loss == "mse":
