@@ -1,4 +1,3 @@
-import ipdb
 import argparse
 from pathlib import Path
 import numpy as np
@@ -94,5 +93,4 @@ subdirs = [x for x in p.iterdir() if x.is_dir()]
 for subdir in subdirs:
     fullpath = p / subdir
     indices, diffs, (en_refs, en_hyps), (de_refs, de_hyps) = rank_helper(fullpath)
-    ipdb.set_trace()
 """

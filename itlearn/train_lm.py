@@ -1,5 +1,4 @@
 import random
-import ipdb
 import math
 
 import numpy as np
@@ -105,10 +104,7 @@ def train_model(args, model, iterators):
             plot_grad(writer, model, iters)
 
         if args.grad_clip > 0:
-            total_norm = nn.utils.clip_grad_norm_(params, args.grad_clip)
-            if total_norm != total_norm or math.isnan(total_norm) or np.isnan(total_norm):
-                ipdb.set_trace()
-
+            nn.utils.clip_grad_norm_(params, args.grad_clip)
         opt.step()
 
         if iters % args.eval_every == 0:
