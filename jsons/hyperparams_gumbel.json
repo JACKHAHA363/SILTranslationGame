@@ -61,7 +61,7 @@
     "decode_method": "greedy",
     "max_len_gen": 50,
     "min_len_gen": 3,
-    "msg_len_ratio": 1.0,
+    "msg_len_ratio": -1.0,
 
     "debug": false,
     "plot_grad": false,
