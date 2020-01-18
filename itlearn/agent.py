@@ -144,7 +144,7 @@ class ImageGrounding(ArgsModule):
         batch_size = 64
         result = []
         start = 0
-        while start <= img_feat.shape[0]:
+        while start < img_feat.shape[0]:
             end = start + batch_size
             batch_img_feat = cuda(img_feat[start: end])
             batch_img_feat = F.dropout(batch_img_feat,
@@ -165,7 +165,7 @@ class ImageGrounding(ArgsModule):
         batch_size = 64
         start = 0
         result = []
-        while start <= sents.shape[0]:
+        while start < sents.shape[0]:
             end = start + batch_size
             batch_sent = cuda(sents[start: end])
             batch_len = cuda(sent_lens[start: end])
