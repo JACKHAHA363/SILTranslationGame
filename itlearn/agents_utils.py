@@ -33,6 +33,7 @@ def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, 
             raise Exception()
 
     if args.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
+        ranker.eval()
         img = cuda(all_img.index_select(dim=0, index=batch.idx.cpu()))  # (batch_size, D_img)
 
         if args.img_pred_loss == "nll":
@@ -45,6 +46,24 @@ def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, 
         if args.train_ranker:
             rewards['img_pred'] = -1 * img_pred_loss.detach()
         results.update({"img_pred_loss_{}".format(args.img_pred_loss): img_pred_loss.mean()})
+
+        # Get ranker retrieval result
+        with torch.no_grad():
+            K = 19
+            # Randomly select K distractor image
+            random_idx = torch.randint(all_img.shape[0], size=[batch_size, K])
+            wrong_img = cuda(all_img.index_select(dim=0, index=random_idx.view(-1)))
+            wrong_img_feat = ranker.batch_enc_img(wrong_img).view(batch_size, K, -1)
+            right_img_feat = ranker.batch_enc_img(img)
+
+            # [bsz, K+1, hid_size]
+            all_feat = torch.cat([right_img_feat.unsqueeze(1), wrong_img_feat], dim=1)
+
+            # [bsz, hid_size]
+            cap_feats = ranker.batch_cap_rep(en_msg, en_msg_len)
+            scores = (cap_feats.unsqueeze(1) * all_feat).sum(-1)
+            r1_acc = (torch.argmax(scores, -1) == 0).float().mean()
+            results['r1_acc'] = r1_acc
     return results, rewards
 
 
@@ -121,6 +140,7 @@ def _base_train(args, model, iterators, extra_input, loop, is_a2c=False):
 
     if args.use_ranker:
         monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
+        monitor_names.extend(["r1_acc"])
     if args.use_en_lm:
         monitor_names.append('en_nll_lm')
     loop(args=args, model=model, train_it=train_it, dev_it=dev_it,
