@@ -174,7 +174,7 @@ def plot_imitate_stats(teacher_stats, imitate_statss):
 
 def get_student_opts(args, student, student_opts=None):
     # Same opt
-    if args.same_opt and student_opts is not None:
+    if args.same_opt and student_opts[0] is not None and student_opts[1] is not None:
         args.logger.info('Reuse optimizer!')
         return student_opts
 
