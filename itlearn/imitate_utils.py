@@ -14,12 +14,13 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
     """ Imitate speake """
     args.logger.info('Imitate fr en!')
     imitate_statss = []
+    eval_freq = max(int(args.fr_en_k2 / 50), 5)
     for iters, batch in enumerate(train_it):
         if iters >= args.fr_en_k2:
             args.logger.info('student fr en stop learning after {} training steps'.format(args.fr_en_k2))
             break
 
-        if args.save_imitate_stats and iters % 20 == 0:
+        if args.save_imitate_stats and iters % eval_freq == 0:
             args.logger.info('Record imitate stats at {}'.format(iters))
             student.eval()
             stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
@@ -72,12 +73,13 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt):
     else:
         args.logger.info('Finetune en de')
     imitate_statss = []
+    eval_freq = max(int(args.en_de_k2 / 50), 5)
     for iters, batch in enumerate(train_it):
         if iters >= args.en_de_k2:
             args.logger.info('student en de stop learning after {} steps'.format(args.en_de_k2))
             break
 
-        if args.save_imitate_stats and iters % 20 == 0:
+        if args.save_imitate_stats and iters % eval_freq == 0:
             args.logger.info('Record imitate stats at {}'.format(iters))
             student.eval()
             stats = get_en_de_imitate_stats(args, student, dev_it)
