@@ -91,21 +91,17 @@ def save_dict_to_json(d, json_path):
 def get_hp_str(args):
     if args.setup == "joint":
         hp_str = "{}_".format(args.setup) + \
-                 "{}_".format(args.model.lower()) + \
                  "seed{}_".format(args.seed) + \
-                 "{}".format( "cpt{}_".format(args.cpt_iter)) + \
                  "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\
                  "{}".format( "h{}_".format(args.h_co) ) +\
                  "{}".format( "hann{}k_".format(args.h_co_anneal_steps // 1000) if args.h_co_anneal else "" ) +\
                  "{}".format( "lm{}_enlm{}_".format(args.en_lm_dataset, args.en_lm_nll_co) ) +\
                  "{}".format( "ranker{}_imgpred_{}_c{}_".format(args.ranker_dataset, args.img_pred_loss, args.img_pred_loss_co) ) +\
-                 "img{}_emb{}_hid{}_".format(args.D_img, args.D_emb, args.D_hid) + \
-                 "{}l_".format(args.n_layers) + \
                  "lr{:.0e}_".format(args.lr) + \
                  "{}_".format(args.lr_anneal) + \
                  "ann{}k_".format(args.linear_anneal_steps // 1000) + \
                  "drop{}_".format(args.drop_ratio) + \
-                 "ratio{}_".format( args.msg_len_ratio ) + \
+                 "ratio{}_".format(args.msg_len_ratio) + \
                  "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
                  ""
     elif args.setup == "gumbel":
