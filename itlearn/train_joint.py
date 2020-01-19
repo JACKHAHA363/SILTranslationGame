@@ -17,7 +17,11 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
         writer = SummaryWriter( args.event_path + args.id_str)
 
     # Prepare opt
-    params = [p for p in model.parameters() if p.requires_grad]
+    if args.fix_fr2en:
+        args.logger.info('Fix Fr En')
+        params = [p for p in model.en_de.parameters() if p.requires_grad]
+    else:
+        params = [p for p in model.parameters() if p.requires_grad]
     if args.optimizer == 'Adam':
         opt = torch.optim.Adam(params, betas=(0.9, 0.98), eps=1e-9, lr=args.lr)
     else:
