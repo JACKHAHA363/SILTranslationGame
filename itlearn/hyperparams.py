@@ -102,7 +102,24 @@ def get_hp_str(args):
                  "ann{}k_".format(args.linear_anneal_steps // 1000) + \
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format(args.msg_len_ratio) + \
-                 "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
+                 ""
+    elif args.setup == 'itlearn':
+        hp_str = "{}_".format(args.setup) + \
+                 "seed{}_".format(args.seed) + \
+                 "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\
+                 "{}".format( "h{}_".format(args.h_co) ) +\
+                 "{}".format( "hann{}k_".format(args.h_co_anneal_steps // 1000) if args.h_co_anneal else "" ) +\
+                 "{}".format( "lm{}_enlm{}_".format(args.en_lm_dataset, args.en_lm_nll_co) ) +\
+                 "{}".format( "ranker{}_imgpred_{}_c{}_".format(args.ranker_dataset, args.img_pred_loss, args.img_pred_loss_co) ) +\
+                 "lr{:.0e}_".format(args.lr) + \
+                 "{}_".format(args.lr_anneal) + \
+                 "ann{}k_".format(args.linear_anneal_steps // 1000) + \
+                 "drop{}_".format(args.drop_ratio) + \
+                 "ratio{}_".format(args.msg_len_ratio) + \
+                 "sameopt_{}_finetune{}_".format(args.same_opt, args.en_de_finetune) + \
+                 "k1{}_".format(args.k1) + \
+                 "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
+                 "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \
                  ""
     elif args.setup == "gumbel":
         hp_str = "{}_".format(args.setup) + \
@@ -128,21 +145,6 @@ def get_hp_str(args):
                  "k1{}_".format(args.k1) + \
                  "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
                  "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \
-                 ""
-    elif args.setup == 'itlearn':
-        hp_str = "{}_".format(args.setup) + \
-                 "seed{}_".format(args.seed) + \
-                 "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\
-                 "{}".format( "h{}_".format(args.h_co) ) +\
-                 "{}".format( "hann{}k_".format(args.h_co_anneal_steps // 1000) if args.h_co_anneal else "" ) +\
-                 "{}".format( "lm{}_enlm{}_".format(args.en_lm_dataset, args.en_lm_nll_co) ) +\
-                 "{}".format( "ranker{}_imgpred_{}_c{}_".format(args.ranker_dataset, args.img_pred_loss, args.img_pred_loss_co) ) +\
-                 "lr{:.0e}_".format(args.lr) + \
-                 "{}_".format(args.lr_anneal) + \
-                 "ann{}k_".format(args.linear_anneal_steps // 1000) + \
-                 "drop{}_".format(args.drop_ratio) + \
-                 "ratio{}_".format(args.msg_len_ratio) + \
-                 "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
                  ""
     elif args.setup == "single":
         hp_str = "{}_".format(args.setup) + \
