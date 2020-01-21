@@ -30,6 +30,14 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
     train_metrics = Metrics('train_loss', *loss_names, *monitor_names, data_type="avg")
     best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=model, opt=opt, path=args.model_path + args.id_str,
                 gpu=args.gpu, debug=args.debug)
+
+    fr_en_it, en_de_it = None, None
+    if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
+        args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
+        fr_en_it, en_de_it = extra_input['s2p_its']['fr-en'], extra_input['s2p_its']['en-de']
+        fr_en_it = iter(fr_en_it)
+        en_de_it = iter(en_de_it)
+
     for iters, train_batch in enumerate(train_it):
         if iters >= args.max_training_steps:
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
@@ -76,10 +84,10 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             h_co_end = args.h_co_min
             return max(0, (args.h_co - h_co_end) * (args.h_co_anneal_steps - iters) / args.h_co_anneal_steps) + h_co_end
 
-        if args.lr_anneal == "linear":
+        if hasattr(args, 'lr_anneal') and args.lr_anneal == "linear":
             opt.param_groups[0]['lr'] = get_lr_anneal(iters)
 
-        if args.h_co_anneal == "linear":
+        if hasattr(args, 'h_co_anneal') and args.h_co_anneal == "linear":
             loss_cos['neg_Hs'] = get_h_co_anneal(iters)
 
         opt.zero_grad()
@@ -94,6 +102,10 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             total_loss += loss * loss_cos[loss_name]
 
         train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
+        # Add S2P Grad
+        if args.s2p_freq > 0 and iters % args.s2p_freq == 0:
+            fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
+            total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
 
         total_loss.backward()
         if args.plot_grad:
@@ -116,3 +128,24 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
                      iters, prefix="train/")
             write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
             train_metrics.reset()
+
+
+def s2p_batch(fr_en_it, en_de_it, agents):
+    fr_en_batch = fr_en_it.__next__()
+    en_de_batch = en_de_it.__next__()
+    fr_en_loss = _get_nll(agents.fr_en,
+                          fr_en_batch.src[0],
+                          fr_en_batch.src[1],
+                          fr_en_batch.trg[0])
+    en_de_loss = _get_nll(agents.en_de,
+                          en_de_batch.src[0],
+                          en_de_batch.src[1],
+                          en_de_batch.trg[0])
+    return fr_en_loss, en_de_loss
+
+
+def _get_nll(model, src, src_len, trg):
+    logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
+    loss = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                             reduction='mean', ignore_index=0)
+    return loss

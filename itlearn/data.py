@@ -33,6 +33,35 @@ def dyn_batch_without_padding(new, i, sofar):
 batch_size_fn = dyn_batch_without_padding
 
 
+def get_s2p_dataset(args):
+    its = {}
+    device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
+    bpe_path = os.path.join(args.data_dir, 'bpe')
+    en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
+    for pair in ['fr-en', 'en-de']:
+        src_field = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
+                                include_lengths=True, batch_first=True)
+        trg_field = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
+                                include_lengths=True, batch_first=True)
+        src, trg = ["." + xx for xx in pair.split("-")]
+        vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
+        for (field, vocab) in zip([src_field, trg_field], vocabs):
+            field.vocab = TextVocab(counter=torch.load(join(bpe_path, vocab)))
+
+        train_path = join(bpe_path, 'iwslt', pair, 'train.' + pair)
+        train_data = NormalTranslationDataset(path=train_path,
+                                              exts=(src, trg), fields=(src_field, trg_field),
+                                              load_dataset=args.load_dataset,
+                                              save_dataset=args.save_dataset,
+                                              training_max_len=args.training_max_len)
+        train_it = data.BucketIterator(train_data, args.batch_size, device=device,
+                                       batch_size_fn=batch_size_fn, train=True,
+                                       repeat=True, shuffle=True,
+                                       sort=False, sort_within_batch=True)
+        its[pair] = train_it
+    return its
+
+
 def build_dataset(args, dataset):
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
 
