@@ -50,29 +50,29 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
                 torch.save([iters, opt.state_dict()],
                            '{}_iter={}.pt.states'.format(args.model_path + args.id_str, iters))
 
-        #if iters % args.eval_every == 0:
-        #    dev_metrics = valid_model(model, dev_it, loss_names, monitor_names, extra_input)
-        #    eval_metric, bleu_en, bleu_de = eval_model(args, model, dev_it, monitor_names, iters, extra_input)
-        #    if not args.debug:
-        #        write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names],
-        #                 iters, prefix="dev/")
-        #        write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names],
-        #                 iters, prefix="dev/")
+        if iters % args.eval_every == 0:
+            dev_metrics = valid_model(model, dev_it, loss_names, monitor_names, extra_input)
+            eval_metric, bleu_en, bleu_de = eval_model(args, model, dev_it, monitor_names, iters, extra_input)
+            if not args.debug:
+                write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names],
+                         iters, prefix="dev/")
+                write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names],
+                         iters, prefix="dev/")
 
-        #        write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
-        #                 prefix="bleu_en/")
-        #        write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
-        #                 prefix="bleu_de/")
-        #        write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
-        #        write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
-        #                 iters, prefix="eval/")
+                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
+                         prefix="bleu_en/")
+                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
+                         prefix="bleu_de/")
+                write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
+                write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
+                         iters, prefix="eval/")
 
-        #    args.logger.info('model:' + args.prefix + args.hp_str)
-        #    best.accumulate(bleu_de[0], bleu_en[0], iters)
-        #    args.logger.info(best)
-        #    if args.early_stop and (iters - best.iters) // args.eval_every > args.patience:
-        #        args.logger.info("Early stopping.")
-        #        break
+            args.logger.info('model:' + args.prefix + args.hp_str)
+            best.accumulate(bleu_de[0], bleu_en[0], iters)
+            args.logger.info(best)
+            if args.early_stop and (iters - best.iters) // args.eval_every > args.patience:
+                args.logger.info("Early stopping.")
+                break
 
         model.train()
 
