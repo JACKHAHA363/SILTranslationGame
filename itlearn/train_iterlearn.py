@@ -27,9 +27,9 @@ def get_h_co_anneal(args, iters):
 def selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
                   train_metrics, writer):
     """ Perform a step of selfplay """
-    if args.lr_anneal == "linear":
+    if hasattr(args, 'lr_anneal') and args.lr_anneal == "linear":
         opt.param_groups[0]['lr'] = get_lr_anneal(args, iters)
-    if args.h_co_anneal == "linear":
+    if hasattr(args, 'h_co_anneal') and args.h_co_anneal == "linear":
         loss_cos['neg_Hs'] = get_h_co_anneal(args, iters)
     opt.zero_grad()
     batch_size = len(train_batch)

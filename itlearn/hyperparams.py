@@ -102,6 +102,7 @@ def get_hp_str(args):
                  "ann{}k_".format(args.linear_anneal_steps // 1000) + \
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format(args.msg_len_ratio) + \
+                 "s2pfreq{}_s2p{}_".format(args.s2p_freq, args.s2p_co) + \
                  ""
     elif args.setup == 'itlearn':
         hp_str = "{}_".format(args.setup) + \
@@ -136,6 +137,7 @@ def get_hp_str(args):
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format( args.msg_len_ratio ) + \
                  "{}".format("clip{}_".format(args.grad_clip) if args.grad_clip != -1.0 else "") + \
+                 "s2pfreq{}_s2p{}_".format(args.s2p_freq, args.s2p_co) + \
                  ""
     elif args.setup == "gumbel_itlearn":
         hp_str = "lr{:.0e}_".format(args.lr) + \

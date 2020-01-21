@@ -11,6 +11,7 @@ from run_utils import get_model, get_data, get_ckpt_paths
 from utils import set_seed, get_logger
 from agent import ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params, get_hp_str
+from data import get_s2p_dataset
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +76,7 @@ model_path = join(main_path, 'model/{}/{}_best.pt')
 
 
 # Loading EN LM
-extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None}
+extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None, "s2p_it": None}
 if args.setup in JOINT_SETUPS and args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
@@ -118,6 +119,11 @@ if (args.setup in JOINT_SETUPS) and args.use_ranker:
     #    args.logger.info("Loading {} image features: train {} valid {}".format( \
     #                      args.dataset.upper(), img['coco'][0].shape, img['coco'][1].shape ))
     extra_input["img"] = img
+
+# Get iwslt its for s2p
+if args.setup in JOINT_SETUPS:
+     extra_input['s2p_its'] = get_s2p_dataset(args)
+
 
 # Loading checkpoints pretrained on IWSLT
 if args.setup in JOINT_SETUPS and hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
