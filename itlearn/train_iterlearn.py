@@ -126,7 +126,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
                       train_metrics, writer)
 
-        if (iters + 1) % args.k1 == 0:
+        if (iters + 1) % args.k1 == 0 and (iters + 1) < args.max_itlearn_steps:
             args.logger.info('start imitating...')
             student.train()
             model.eval()
