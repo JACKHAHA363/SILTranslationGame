@@ -50,7 +50,7 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
 def decode_model(args, model, iterators):
     (dev_it) = iterators
 
-    if args.gpu > -1 and torch.cuda.is_available():
+    if args.gpu > -1 and torch.cuda.device_count() > 0:
         map_location = lambda storage, loc: storage.cuda()
     else:
         map_location = lambda storage, loc: storage

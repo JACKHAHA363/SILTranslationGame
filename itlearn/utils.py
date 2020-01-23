@@ -148,7 +148,7 @@ def xlen_to_inv_mask(x_len, seq_len=None):
 
 loc = torch.tensor(0.)
 scale = torch.tensor(1.)
-if torch.cuda.is_available():
+if torch.cuda.device_count() > 0:
     GUMBEL_DIST = torch.distributions.Gumbel(loc=loc.cuda(), scale=scale.cuda())
 else:
     GUMBEL_DIST = torch.distributions.Gumbel(loc=loc, scale=scale)
@@ -171,7 +171,7 @@ def gumbel_softmax_hard(logits, temp, st):
     return y
 
 def cuda(x):
-    if torch.cuda.is_available():
+    if torch.cuda.device_count() > 0:
         return x.cuda()
     return x
 
@@ -185,7 +185,7 @@ def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
+    if torch.cuda.device_count() > 0:
         torch.cuda.manual_seed_all(args.seed)
     if args.deterministic and torch.backends.cudnn.enabled:
         torch.backends.cudnn.deterministic = True

@@ -83,7 +83,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     # Prepare_init_student
     student = get_model(args)
     student.load_state_dict(model.state_dict())
-    if torch.cuda.is_available() and args.gpu > -1:
+    if torch.cuda.device_count() > 0 and args.gpu > -1:
         student.cuda(args.gpu)
     stu_fr_en_opt, stu_en_de_opt = None, None
     for iters, train_batch in enumerate(train_it):

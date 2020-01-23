@@ -67,7 +67,7 @@ args.logger.info('Starting with HPARAMS: {}'.format(args.hp_str))
 # Model
 model = get_model(args)
 
-if args.gpu > -1 and torch.cuda.is_available():
+if args.gpu > -1 and torch.cuda.device_count() > 0:
     map_location = lambda storage, loc: storage.cuda()
 else:
     map_location = lambda storage, loc: storage
@@ -85,7 +85,7 @@ if args.setup in JOINT_SETUPS and args.use_en_lm:
     en_lm = LM_CLS(args_, len(args.EN.vocab.itos))
     en_lm.load_state_dict(torch.load(lm_model, map_location))
     en_lm.eval()
-    if torch.cuda.is_available():
+    if torch.cuda.device_count() > 0:
         en_lm.cuda(args.gpu)
     extra_input["en_lm"] = en_lm
 
@@ -100,7 +100,7 @@ if (args.setup in JOINT_SETUPS) and args.use_ranker:
         ranker = ImageGrounding(args_, len(args.EN.vocab.itos))
     ranker.load_state_dict(torch.load(ranker_model, map_location) )
     ranker.eval()
-    if torch.cuda.is_available():
+    if torch.cuda.device_count() > 0:
         ranker.cuda(args.gpu)
     extra_input["ranker"] = ranker
 
@@ -152,7 +152,7 @@ for name, param in model.named_parameters():
 
 args.logger.info("Model size {:,}".format( sum( [ np.prod(x.size()) for x in params ] )) )
 
-if torch.cuda.is_available() and args.gpu > -1:
+if torch.cuda.device_count() > 0 and args.gpu > -1:
     model.cuda(args.gpu)
 
 # Main
