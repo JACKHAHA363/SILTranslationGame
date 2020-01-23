@@ -86,6 +86,9 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     if torch.cuda.device_count() > 0 and args.gpu > -1:
         student.cuda(args.gpu)
     stu_fr_en_opt, stu_en_de_opt = None, None
+
+    # Determine when to stop iterlearn
+    max_itlearn_steps = args.max_itlearn_steps if args.max_itlearn_steps > 0 else args.max_training_steps
     for iters, train_batch in enumerate(train_it):
         if iters >= args.max_training_steps:
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
@@ -126,8 +129,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
                       train_metrics, writer)
 
-        if (iters + 1) % args.k1 == 0 and (iters + 1) < args.max_itlearn_steps:
-            args.logger.info('start imitating...')
+        if (iters + 1) % args.k1 == 0 and (iters + 1) < max_itlearn_steps:
+            args.logger.info('start imitating at iters {}'.format(iters + 1))
             student.train()
             model.eval()
             stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
