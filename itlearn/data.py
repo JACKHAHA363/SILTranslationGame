@@ -53,7 +53,7 @@ def get_s2p_dataset(args):
                                               exts=(src, trg), fields=(src_field, trg_field),
                                               load_dataset=args.load_dataset,
                                               save_dataset=args.save_dataset,
-                                              training_max_len=args.training_max_len)
+                                              training_max_len=None)
         train_it = data.BucketIterator(train_data, args.batch_size, device=device,
                                        batch_size_fn=batch_size_fn, train=True,
                                        repeat=True, shuffle=True,
