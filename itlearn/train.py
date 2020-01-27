@@ -35,7 +35,7 @@ if not hasattr(args, 'data_dir'):
 args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
-JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn']
+JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn', 'aug_s2p']
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single'] + JOINT_SETUPS:
     folders.append('decoding')
@@ -191,6 +191,10 @@ elif args.setup == 'gumbel_itlearn':
     from agents_utils import train_gumbel_model
     from train_iterlearn import itlearn_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
+elif args.setup == 'aug_s2p':
+    from agents_utils import train_gumbel_model
+    from train_aug_s2p import joint_loop
+    train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 else:
     raise ValueError
 
