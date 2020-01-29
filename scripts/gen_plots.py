@@ -26,9 +26,10 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from math import ceil
+import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'dev_neg_Hs']
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'dev_neg_Hs', 'dev_ce_loss', 'train_ce_loss']
 
 # Plot Config
 NB_COL = 2
@@ -116,16 +117,53 @@ def main():
     # Start plotting
     fig, axs = plt.subplots(NB_ROW, NB_COL, figsize=(7*NB_COL, 5*NB_ROW))
     for tag, ax in zip(all_tags, axs.reshape(-1)):
+        data = {}
+        min_steps = math.inf
         for exp_name in exp_names:
             steps, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
-            line, = ax.plot(steps, means)
+            data[exp_name] = (steps, means, stds)
+            if steps[-1] < min_steps:
+                min_steps = steps[-1]
+
+        # Use the smallest step in data
+        print('[{}] Min steps is '.format(tag), min_steps)
+        for exp_name in exp_names:
+            steps, means, stds = data[exp_name]
+            new_steps, new_means, new_stds = [], [], []
+            for step, mean, std in zip(steps, means, stds):
+                new_steps.append(step)
+                new_means.append(mean)
+                new_stds.append(std)
+                #if step <= min_steps:
+                #    new_steps.append(step)
+                #    new_means.append(mean)
+                #    new_stds.append(std)
+                #else:
+                #    break
+            new_means = np.array(new_means)
+            new_stds = np.array(new_stds)
+            line, = ax.plot(new_steps, new_means)
             line.set_label(exp_name)
-            ax.fill_between(steps, means - stds, means + stds, alpha=0.2)
+            ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
+                            alpha=0.2)
         ax.set_xlabel('steps')
         ax.set_title(tag)
     axs.reshape(-1)[0].legend()
     fig.savefig(os.path.join(args.output_dir, 'output.png'))
 
+    # Get table
+    from pandas import DataFrame
+    df = DataFrame(columns=all_tags)
+    for exp_name in exp_names:
+        _, mean_de_bleus, _ = combine_series([run_data['eval_bleu_de']
+                                              for run_data in all_data[exp_name]])
+        max_id = np.argmax(mean_de_bleus)
+        for tag in all_tags:
+            _, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
+            max_mean = means[max_id]
+            max_std = stds[max_id]
+            df.loc[exp_name, tag] = "{:.3f}({:.3f})".format(max_mean, max_std)
+    print(df)
 
 if __name__ == '__main__':
     main()
