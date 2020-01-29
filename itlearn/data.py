@@ -54,6 +54,8 @@ def get_s2p_dataset(args):
                                               load_dataset=args.load_dataset,
                                               save_dataset=args.save_dataset,
                                               training_max_len=None)
+        if hasattr(args, 's2p_small') and args.s2p_small:
+            train_data.examples = train_data.examples[:int(len(train_data) / 10)]
         train_it = data.BucketIterator(train_data, args.batch_size, device=device,
                                        batch_size_fn=batch_size_fn, train=True,
                                        repeat=True, shuffle=True,
@@ -90,6 +92,44 @@ def build_dataset(args, dataset):
                                               load_dataset=args.load_dataset, save_dataset=args.save_dataset,
                                               training_max_len=args.training_max_len)
 
+        dev_data = NormalTranslationDataset(path=dev_path,
+                                            exts=(src, trg), fields=(SRC, TRG),
+                                            load_dataset=args.load_dataset, save_dataset=args.save_dataset)
+
+        train_it = data.BucketIterator(train_data, args.batch_size, device=device,
+                                       batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
+                                       sort=False, sort_within_batch=True)
+        dev_it = data.BucketIterator(dev_data, args.batch_size, device=device,
+                                     batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
+                                     sort=False, sort_within_batch=True)
+        args.__dict__.update({'src': SRC, "trg": TRG,
+                              'voc_sz_src': len(SRC.vocab),
+                              'voc_sz_trg': len(TRG.vocab)})
+
+    elif dataset == 'iwslt_small':
+        SRC = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK, \
+                          include_lengths=True, batch_first=True)
+        TRG = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK, \
+                          include_lengths=True, batch_first=True)
+
+        src, trg = ["." + xx for xx in args.pair.split("_")]
+        pair = args.pair.replace('_', '-')
+
+        vocabs = [en_vocab, de_vocab] if pair == "en-de" else [fr_vocab, en_vocab]
+
+        for (field, vocab) in zip([SRC, TRG], vocabs):
+            field.vocab = TextVocab(counter=torch.load(join(bpe_path, vocab)))
+
+        train_path = join(bpe_path, 'iwslt', pair, 'train.' + pair)
+        dev_path = join(bpe_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
+        train_data = NormalTranslationDataset(path=train_path,
+                                              exts=(src, trg), fields=(SRC, TRG),
+                                              load_dataset=args.load_dataset, save_dataset=args.save_dataset,
+                                              training_max_len=args.training_max_len)
+        print('nb examples: {} -> {}'.format(len(train_data), int(len(train_data) / 10)))
+
+        # Cut examples by half
+        train_data.examples = train_data.examples[:int(len(train_data) / 10)]
         dev_data = NormalTranslationDataset(path=dev_path,
                                             exts=(src, trg), fields=(SRC, TRG),
                                             load_dataset=args.load_dataset, save_dataset=args.save_dataset)
