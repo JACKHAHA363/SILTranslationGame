@@ -19,7 +19,7 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
         src_corpus, trg_corpus, hyp_corpus = [], [], []
 
         for j, dev_batch in enumerate(dev_it):
-            if args.dataset == "iwslt":
+            if args.dataset == "iwslt" or args.dataset == 'iwslt_small':
                 src, src_len = dev_batch.src
                 trg, trg_len = dev_batch.trg
             elif args.dataset == "multi30k":
@@ -109,7 +109,7 @@ def train_model(args, model, iterators):
         opt.zero_grad()
 
         batch_size = len(train_batch)
-        if args.dataset == "iwslt":
+        if args.dataset == "iwslt" or args.dataset == 'iwslt_small':
             src, src_len = train_batch.src
             trg, trg_len = train_batch.trg
         elif args.dataset == "multi30k":

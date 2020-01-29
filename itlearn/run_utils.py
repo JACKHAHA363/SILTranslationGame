@@ -9,9 +9,7 @@ def get_model(args):
         model = AgentsA2C(args)
     elif args.setup == 'itlearn':
         model = AgentsA2C(args)
-    elif args.setup == 'gumbel' or 'aug_s2p':
-        model = AgentsGumbel(args)
-    elif args.setup == 'gumbel_itlearn':
+    elif args.setup == 'gumbel' or args.setup == 'aug_s2p' or args.setup == 'gumbel_itlearn':
         model = AgentsGumbel(args)
     elif args.setup == "single":
         model = RNNAttn(args, args.voc_sz_src, args.voc_sz_trg)
