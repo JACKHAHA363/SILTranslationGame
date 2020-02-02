@@ -10,6 +10,7 @@ from run_utils import get_model
 import matplotlib.pyplot as plt
 from agents_utils import eval_model, valid_model
 import os
+from pandas import DataFrame
 from pathlib import Path
 from imitate_utils import imitate_fr_en, imitate_en_de, get_fr_en_imitate_stats, get_en_de_imitate_stats
 
@@ -132,6 +133,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         if (iters + 1) % args.k1 == 0 and (iters + 1) < max_itlearn_steps:
             args.logger.info('start imitating at iters {}'.format(iters + 1))
             student.train()
+            old_student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
+            old_student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
             model.eval()
             stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
             fr_en_statss = imitate_fr_en(args, student=student,
@@ -141,17 +144,30 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
             en_de_statss = imitate_en_de(args, student=student,
                                          teacher=model, train_it=train_it, dev_it=dev_it,
                                          opt=stu_en_de_opt)
+
+            # Report change of student and teacher
+            teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
+            student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
+            teacher_en_de_stats = get_en_de_imitate_stats(args, model, dev_it)
+            student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
+            df = DataFrame(columns=['teacher', 'stu', 'old_stu'])
+            for name in student_fr_en_stats:
+                df.loc[name, 'stu'] = student_fr_en_stats[name]
+                df.loc[name, 'teacher'] = teacher_fr_en_stats[name]
+                df.loc[name, 'old_stu'] = old_student_fr_en_stats[name]
+            for name in student_en_de_stats:
+                df.loc[name, 'stu'] = student_en_de_stats[name]
+                df.loc[name, 'teacher'] = teacher_en_de_stats[name]
+                df.loc[name, 'old_stu'] = old_student_en_de_stats[name]
+            args.logger.info(str(df))
+
             if args.save_imitate_stats:
                 print('Save imitation stats')
                 if not os.path.exists(os.path.join(args.misc_path, args.id_str)):
                     os.makedirs(os.path.join(args.misc_path, args.id_str))
-
-                teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
                 fr_en_fig = plot_imitate_stats(teacher_fr_en_stats, fr_en_statss)
                 fr_en_fig.savefig(os.path.join(args.misc_path, args.id_str, 'fr_en_{}_stats.png'.format(iters + 1)))
                 del fr_en_fig
-
-                teacher_en_de_stats = get_en_de_imitate_stats(args, model, dev_it)
                 en_de_fig = plot_imitate_stats(teacher_en_de_stats, en_de_statss)
                 en_de_fig.savefig(os.path.join(args.misc_path, args.id_str, 'en_de_{}_stats.png'.format(iters + 1)))
                 del en_de_fig
