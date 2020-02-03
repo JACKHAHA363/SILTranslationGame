@@ -29,8 +29,8 @@ from math import ceil
 import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'dev_neg_Hs', 'dev_ce_loss', 'train_ce_loss']
-
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'bleu_en_p_1', "bleu_en_p_4"]
+NAMES = ['BLEU De', 'BLEU En', '1-gram precision', '4-gram precision']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -147,7 +147,7 @@ def main():
             ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
                             alpha=0.2)
         ax.set_xlabel('steps')
-        ax.set_title(tag)
+        ax.set_title(NAMES[TAGS.index(tag)])
     axs.reshape(-1)[0].legend()
     fig.savefig(os.path.join(args.output_dir, 'output.png'))
 
@@ -155,7 +155,7 @@ def main():
     from pandas import DataFrame
     df = DataFrame(columns=all_tags)
     for exp_name in exp_names:
-        _, mean_de_bleus, _ = combine_series([run_data['eval_bleu_de']
+        _, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
                                               for run_data in all_data[exp_name]])
         max_id = np.argmax(mean_de_bleus)
         for tag in all_tags:
