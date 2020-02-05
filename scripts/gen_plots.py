@@ -29,8 +29,8 @@ from math import ceil
 import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'bleu_en_p_1', "bleu_en_p_4"]
-NAMES = ['BLEU De', 'BLEU En', '1-gram precision', '4-gram precision']
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc']
+NAMES = ['BLEU De', 'BLEU En', 'NLL', 'R1']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -115,8 +115,8 @@ def main():
             all_data[exp_name].append(run_data)
 
     # Start plotting
-    fig, axs = plt.subplots(NB_ROW, NB_COL, figsize=(7*NB_COL, 5*NB_ROW))
-    for tag, ax in zip(all_tags, axs.reshape(-1)):
+    for tag in all_tags:
+        fig, ax = plt.subplots(figsize=(7, 5))
         data = {}
         min_steps = math.inf
         for exp_name in exp_names:
@@ -148,8 +148,8 @@ def main():
                             alpha=0.2)
         ax.set_xlabel('steps')
         ax.set_title(NAMES[TAGS.index(tag)])
-    axs.reshape(-1)[0].legend()
-    fig.savefig(os.path.join(args.output_dir, 'output.png'))
+        ax.legend()
+        fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
 
     # Get table
     from pandas import DataFrame
