@@ -5,6 +5,7 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from nltk import word_tokenize
+import numpy as np
 
 
 def get_args():
@@ -16,7 +17,6 @@ def get_args():
 
 args = get_args()
 files = os.listdir(args.txts)
-files = ['ref', 'NIL', 'S2P1', 'S2P5', 'Gumbel', 'Pretrain']
 ref_id = files.index('ref')
 liness = []
 for file in files:
@@ -60,12 +60,14 @@ for file in tqdm(files):
 	for tag in TAGS:
 		pos_dist[tag] /= float(total_tags)
 	pos_dist_dict[file] = pos_dist
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(8,6))
+plt.xticks([i for i in range(len(TAGS))], TAGS, fontsize=15)
+plt.yticks(fontsize=15)
 for file, pos_dist in pos_dist_dict.items():
 	dist = [pos_dist[tag] for tag in TAGS]
-	line, = ax.plot(dist)
+	line, = ax.plot(dist, 'X--')
 	line.set_label(file)
-ax.legend()
+ax.legend(fontsize=20)
 fig.savefig('pos_dist.png')
 
 
