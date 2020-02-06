@@ -29,7 +29,7 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
             num_trg = (trg[:,1:] != 0).sum().item()
 
             dev_metrics.accumulate(num_trg, nll.item())
-            hyp = model.decode(src, src_len, decode_method, beam_width)
+            hyp = model.decode(src[:, 1:], src_len - 1, decode_method, beam_width)
             src_corpus.extend( args.src.reverse( src ) )
             trg_corpus.extend( args.trg.reverse( trg ) )
             hyp_corpus.extend( args.trg.reverse( hyp ) )
