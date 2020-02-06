@@ -154,9 +154,11 @@ def main():
     from pandas import DataFrame
     df = DataFrame(columns=all_tags)
     for exp_name in exp_names:
-        _, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
+        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
                                               for run_data in all_data[exp_name]])
         max_id = np.argmax(mean_de_bleus)
+        max_step = steps[max_id]
+        print('{} max step: {}'.format(exp_name, max_step))
         for tag in all_tags:
             _, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
             max_mean = means[max_id]
