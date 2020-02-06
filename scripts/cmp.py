@@ -9,6 +9,7 @@ def get_args():
 
 args = get_args()
 files = os.listdir(args.txts)
+#files = ['ref', 'Pretrain', 'Gumbel', 'NIL', 'S2P0.1', 'S2P1', 'S2P5']
 liness = []
 for file in files:
 	with open(os.path.join(args.txts, file)) as f:
