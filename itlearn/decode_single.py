@@ -36,15 +36,6 @@ def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, t
         args.logger.info(dev_metrics)
         args.logger.info("{} {} : {}".format(test_set, decode_method, print_bleu(bleu)))
         args.logger.info('model:' + args.prefix + args.id_str)
-
-        if not args.debug:
-            src = Path( args.decoding_path ) / args.id_str / "src"
-            trg = Path( args.decoding_path ) / args.id_str / "trg"
-            hyp = Path( args.decoding_path ) / args.id_str / "hyp"
-            src.write_text("\n".join(src_corpus), encoding="utf-8")
-            trg.write_text("\n".join(trg_corpus), encoding="utf-8")
-            hyp.write_text("\n".join(hyp_corpus), encoding="utf-8")
-
     return bleu
 
 def decode_model(args, model, iterators):
@@ -55,15 +46,8 @@ def decode_model(args, model, iterators):
     else:
         map_location = lambda storage, loc: storage
 
-    pretrained = torch.load( "{}_best.pt".format(args.load_from), map_location )
+    pretrained = torch.load( "{}_best.pt".format(args.load_from), map_location)
     model.load_state_dict( pretrained )
     args.logger.info("Pretrained model loaded.")
-
-    if not args.debug:
-        decoding_path = Path(args.decoding_path + args.id_str)
-        decoding_path.mkdir(parents=True, exist_ok=True)
-        from tensorboardX import SummaryWriter
-        writer = SummaryWriter( args.event_path + args.id_str)
-
     dev_metrics = Metrics('dev_loss', 'nll', data_type = "avg")
     dev_bleu = valid_model(args, model, dev_it, dev_metrics, args.decode_method)

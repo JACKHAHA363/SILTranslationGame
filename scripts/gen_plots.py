@@ -150,7 +150,7 @@ def main():
         # Use Plot until max_steps + 10k
         for exp_name in exp_names:
             steps, means, stds = data[exp_name]
-            plot_steps = min(max_steps[exp_name] + 10000, steps[-1])
+            plot_steps = min(max_steps[exp_name] + 1000, steps[-1])
             new_steps, new_means, new_stds = [], [], []
             for step, mean, std in zip(steps, means, stds):
                 new_steps.append(step)
