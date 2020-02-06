@@ -114,9 +114,31 @@ def main():
             all_tags = list(run_data.keys())
             all_data[exp_name].append(run_data)
 
+
+    # Get table
+    from pandas import DataFrame
+    df = DataFrame(columns=all_tags)
+    max_steps = {}
+    for exp_name in exp_names:
+        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
+                                              for run_data in all_data[exp_name]])
+        max_id = np.argmax(mean_de_bleus)
+        max_step = steps[max_id]
+        max_steps[exp_name] = max_step
+        print('{} max step: {}'.format(exp_name, max_step))
+        for tag in all_tags:
+            _, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
+            max_mean = means[max_id]
+            max_std = stds[max_id]
+            df.loc[exp_name, tag] = "{:.3f}({:.3f})".format(max_mean, max_std)
+    print(df)
+
     # Start plotting
     for tag in all_tags:
-        fig, ax = plt.subplots(figsize=(7, 5))
+        fig, ax = plt.subplots(figsize=(8, 6))
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
         data = {}
         min_steps = math.inf
         for exp_name in exp_names:
@@ -125,16 +147,16 @@ def main():
             if steps[-1] < min_steps:
                 min_steps = steps[-1]
 
-        # Use the smallest step in data
-        print('[{}] Min steps is '.format(tag), min_steps)
+        # Use Plot until max_steps + 10k
         for exp_name in exp_names:
             steps, means, stds = data[exp_name]
+            plot_steps = min(max_steps[exp_name] + 10000, steps[-1])
             new_steps, new_means, new_stds = [], [], []
             for step, mean, std in zip(steps, means, stds):
                 new_steps.append(step)
                 new_means.append(mean)
                 new_stds.append(std)
-                if step <= min_steps:
+                if step <= plot_steps:
                     new_steps.append(step)
                     new_means.append(mean)
                     new_stds.append(std)
@@ -146,25 +168,10 @@ def main():
             line.set_label(exp_name)
             ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
                             alpha=0.2)
-        ax.set_xlabel('steps')
+        ax.set_xlabel('steps', fontsize=20)
         ax.legend(fontsize=20)
         fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
 
-    # Get table
-    from pandas import DataFrame
-    df = DataFrame(columns=all_tags)
-    for exp_name in exp_names:
-        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
-                                              for run_data in all_data[exp_name]])
-        max_id = np.argmax(mean_de_bleus)
-        max_step = steps[max_id]
-        print('{} max step: {}'.format(exp_name, max_step))
-        for tag in all_tags:
-            _, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
-            max_mean = means[max_id]
-            max_std = stds[max_id]
-            df.loc[exp_name, tag] = "{:.3f}({:.3f})".format(max_mean, max_std)
-    print(df)
 
 if __name__ == '__main__':
     main()
