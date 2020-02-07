@@ -134,8 +134,9 @@ def main():
     print(df)
 
     # Start plotting
+    matplotlib.rc('font', size=20)
     for tag in all_tags:
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(8, 7))
         plt.xticks(fontsize=20)
         plt.yticks(fontsize=20)
         plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
@@ -156,7 +157,7 @@ def main():
                 new_steps.append(step)
                 new_means.append(mean)
                 new_stds.append(std)
-                if step <= plot_steps:
+                if step <= min_steps:
                     new_steps.append(step)
                     new_means.append(mean)
                     new_stds.append(std)
