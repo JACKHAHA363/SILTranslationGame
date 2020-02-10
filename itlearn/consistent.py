@@ -10,6 +10,7 @@ from run_utils import get_model, get_data, get_ckpt_paths
 from agent import ImageCaptioning, RNNLM, ImageGrounding
 from imitate_utils import get_fr_en_imitate_stats, _get_imitate_loss
 from hyperparams import Params
+import random
 
 
 # Parse from cmd to get JSON
@@ -31,6 +32,7 @@ main_path = args.exp_dir
 
 # Data
 train_it, dev_it = get_data(args)
+EN = args.EN
 
 if args.gpu > -1 and torch.cuda.device_count() > 0:
     map_location = lambda storage, loc: storage.cuda()
@@ -87,45 +89,70 @@ extra_input = get_extra_input(args)
 # Opt
 fr_en_opt = torch.optim.SGD(model.fr_en.parameters(), momentum=0.9, lr=0.0005)
 monitor_names = []
-monitor_names.extend(["img_pred_loss"])
+monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
 monitor_names.extend(["r1_acc"])
 monitor_names.append('en_nll_lm')
 
 
+def main_loop(args, err_type):
+    statss = []
+    eval_freq = min(max(int(args.fr_en_k2 / 30), 5), 50)
+    iters = 0
+    DAVID = 2464
+    for j, batch in enumerate(train_it):
+        if iters >= args.fr_en_k2:
+            print('fr en stop learning after {} training steps'.format(args.fr_en_k2))
+            break
+
+        if iters % eval_freq == 0:
+            print('Record stats at {}'.format(iters))
+            model.eval()
+            stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
+            statss.append((iters, stats))
+
+        # Train
+        model.train()
+        src, src_len = batch.__dict__['fr']
+        trg, trg_len = batch.__dict__['en']
+        if err_type == 'second':
+            # Insert at second position
+            new_trg = torch.zeros(trg.shape[0], trg.shape[1] + 1).long().to(device=trg.device)
+            for idx, sent in enumerate(trg):
+                sent = sent.tolist()
+                sent.insert(2, DAVID)
+                new_trg[idx] = torch.LongTensor(sent)
+        elif err_type == 'random':
+            # Insert at random position
+            new_trg = torch.zeros(trg.shape[0], trg.shape[1] + 1).long().to(device=trg.device)
+            for idx, (sent, length) in enumerate(zip(trg, trg_len)):
+                sent = sent.tolist()
+                sent.insert(random.randint(1, length - 2), DAVID)
+                new_trg[idx] = torch.LongTensor(sent)
+        else:
+            raise ValueError('Invalid err_type')
+        trg_len += 1
+
+        logits, _ = model.fr_en(src[:, 1:], src_len - 1, new_trg[:, :-1])
+        nll = F.cross_entropy(logits, new_trg[:, 1:].contiguous().view(-1), reduction='mean',
+                              ignore_index=0)
+
+        fr_en_opt.zero_grad()
+        nll.backward()
+        fr_en_opt.step()
+        iters += 1
+    from tensorboardX import SummaryWriter
+    from shutil import rmtree
+    print('save result to <{}>'.format(err_type))
+    if os.path.exists(err_type):
+        rmtree(err_type)
+    tb_writer = SummaryWriter(err_type)
+    for step, stats in statss:
+        for key, val in stats.items():
+            tb_writer.add_scalar(key, val, step)
+    tb_writer.flush()
+
+
 # Main loop
 # Training
-statss = []
-eval_freq = max(int(args.fr_en_k2 / 50), 5)
-iters = 0
-for j, batch in enumerate(train_it):
-    if iters >= args.fr_en_k2:
-        print('fr en stop learning after {} training steps'.format(args.fr_en_k2))
-        break
-
-    print('Record stats at {}'.format(iters))
-    model.eval()
-    stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
-    statss.append((iters, stats))
-
-    # Train
-    model.train()
-    src, src_len = batch.__dict__['fr']
-    trg, trg_len = batch.__dict__['en']
-    if args.consistent:
-        # Insert at second position
-        pass
-    else:
-        # Insert at random position
-        pass
-
-    logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
-    nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
-                          ignore_index=0)
-
-    fr_en_opt.zero_grad()
-    nll.backward()
-    fr_en_opt.step()
-
-
-
-
+for err_type in ['random', 'second']:
+    main_loop(args, err_type)
