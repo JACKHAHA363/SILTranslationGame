@@ -34,17 +34,11 @@ main_path = args.exp_dir
 train_it, dev_it = get_data(args)
 EN = args.EN
 
+
 if args.gpu > -1 and torch.cuda.device_count() > 0:
     map_location = lambda storage, loc: storage.cuda()
 else:
     map_location = lambda storage, loc: storage
-
-# Model
-model = get_model(args)
-model.fr_en.load_state_dict(torch.load(args.fr_en_ckpt, map_location))
-model.train(True)
-if args.gpu > -1 and torch.cuda.device_count() > 0:
-    model = model.cuda(args.gpu)
 
 
 def get_extra_input(args):
@@ -86,15 +80,22 @@ def get_extra_input(args):
 
 extra_input = get_extra_input(args)
 
-# Opt
-fr_en_opt = torch.optim.SGD(model.fr_en.parameters(), momentum=0.9, lr=0.0005)
-monitor_names = []
-monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
-monitor_names.extend(["r1_acc"])
-monitor_names.append('en_nll_lm')
-
 
 def main_loop(args, err_type):
+    # Reload model
+    model = get_model(args)
+    model.fr_en.load_state_dict(torch.load(args.fr_en_ckpt, map_location))
+    model.train(True)
+    if args.gpu > -1 and torch.cuda.device_count() > 0:
+        model = model.cuda(args.gpu)
+
+    # Opt
+    fr_en_opt = torch.optim.Adam(model.fr_en.parameters(), lr=args.fr_en_lr)
+    monitor_names = []
+    monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
+    monitor_names.extend(["r1_acc"])
+    monitor_names.append('en_nll_lm')
+
     statss = []
     eval_freq = min(max(int(args.fr_en_k2 / 30), 5), 50)
     iters = 0
@@ -142,10 +143,11 @@ def main_loop(args, err_type):
         iters += 1
     from tensorboardX import SummaryWriter
     from shutil import rmtree
-    print('save result to <{}>'.format(err_type))
-    if os.path.exists(err_type):
-        rmtree(err_type)
-    tb_writer = SummaryWriter(err_type)
+    name = "{}_lr{}".format(err_type, args.fr_en_lr)
+    print('save result to <{}>'.format(name))
+    if os.path.exists(name):
+        rmtree(name)
+    tb_writer = SummaryWriter(name)
     for step, stats in statss:
         for key, val in stats.items():
             tb_writer.add_scalar(key, val, step)
