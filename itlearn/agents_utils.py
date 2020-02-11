@@ -69,7 +69,7 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
         with torch.no_grad():
             src, src_len = batch.__dict__['fr']
             trg, trg_len = batch.__dict__['en']
-            logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
+            logits, _ = model.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
             nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
                                                     ignore_index=0)
             results['nll_real'] = nll
