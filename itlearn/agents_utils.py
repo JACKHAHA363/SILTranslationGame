@@ -7,45 +7,45 @@ from misc.bleu import computeBLEU, print_bleu
 from utils import cuda, sum_reward
 
 
-def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None):
+def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None):
     """ Evaluate this eng sentence with different metric. Can be used as reward """
     results = {}
     rewards = {}
     batch_size = en_msg.shape[0]
     # NOTE add <BOS> to beginning
-    en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), args.init_token)).long(), en_msg], dim=1)
-    if args.use_en_lm:  # monitor EN LM NLL
-        if "wiki" in args.en_lm_dataset:
+    en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), model.init_token)).long(), en_msg], dim=1)
+    if model.use_en_lm:  # monitor EN LM NLL
+        if "wiki" in model.en_lm_dataset:
             en_nll_lm = en_lm.get_nll(en_msg_)  # (batch_size, en_msg_len)
-            if args.train_en_lm:
+            if model.train_en_lm:
                 en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
                 # R = R + -1 * en_nll_lm.detach() * self.en_lm_nll_co # (batch_size)
             results.update({"en_nll_lm": en_nll_lm.mean()})
 
-        elif args.en_lm_dataset in ["coco", "multi30k"]:
+        elif model.en_lm_dataset in ["coco", "multi30k"]:
             en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
-            if args.train_en_lm:
+            if model.train_en_lm:
                 en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
             results.update({"en_nll_lm": en_nll_lm.mean()})
         else:
             raise Exception()
 
-    if args.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
+    if model.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
         ranker.eval()
         img = cuda(all_img.index_select(dim=0, index=batch.idx.cpu()))  # (batch_size, D_img)
 
-        if args.img_pred_loss == "nll":
+        if model.img_pred_loss == "nll":
             img_pred_loss = ranker.get_loss(en_msg_, img)  # (batch_size, en_msg_len)
             img_pred_loss = sum_reward(img_pred_loss, en_msg_len + 1)  # (batch_size)
         else:
             with torch.no_grad():
                 img_pred_loss = ranker(en_msg, en_msg_len, img)["loss"]
 
-        if args.train_ranker:
+        if model.train_ranker:
             rewards['img_pred'] = -1 * img_pred_loss.detach()
-        results.update({"img_pred_loss_{}".format(args.img_pred_loss): img_pred_loss.mean()})
+        results.update({"img_pred_loss_{}".format(model.img_pred_loss): img_pred_loss.mean()})
 
         # Get ranker retrieval result
         with torch.no_grad():
@@ -64,6 +64,15 @@ def eval_fr_en_stats(args, en_msg, en_msg_len, batch, en_lm=None, all_img=None, 
             scores = (cap_feats.unsqueeze(1) * all_feat).sum(-1)
             r1_acc = (torch.argmax(scores, -1) == 0).float().mean()
             results['r1_acc'] = r1_acc
+
+        # NLL Real data
+        with torch.no_grad():
+            src, src_len = batch.__dict__['fr']
+            trg, trg_len = batch.__dict__['en']
+            logits, _ = model.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
+            nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
+                                                    ignore_index=0)
+            results['nll_real'] = nll
     return results, rewards
 
 
@@ -123,7 +132,7 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
 
 def _base_train(args, model, iterators, extra_input, loop, is_a2c=False):
     (train_it, dev_it) = iterators
-    monitor_names = []
+    monitor_names = ['nll_real']
     loss_names = ['ce_loss']
     loss_cos = {"ce_loss": args.ce_co}
 

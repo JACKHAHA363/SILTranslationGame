@@ -8,8 +8,10 @@ import os
 import torch.nn.functional as F
 from run_utils import get_model, get_data, get_ckpt_paths
 from agent import ImageCaptioning, RNNLM, ImageGrounding
-from imitate_utils import get_fr_en_imitate_stats, _get_imitate_loss
 from hyperparams import Params
+from metrics import Metrics
+from agents_utils import eval_fr_en_stats
+from misc.bleu import computeBLEU
 import random
 
 
@@ -81,7 +83,43 @@ def get_extra_input(args):
 extra_input = get_extra_input(args)
 
 
+def get_fr_en_stats(args, model, dev_it, monitor_names, extra_input):
+    """ En BLUE, LM score and img prediction """
+    model.eval()
+    eval_metrics = Metrics('dev_loss', *monitor_names, data_type="avg")
+    eval_metrics.reset()
+    with torch.no_grad():
+        unbpe = True
+        en_corpus = []
+        en_hyp = []
+
+        for j, dev_batch in enumerate(dev_it):
+            en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
+            en_msg, en_msg_len = model.fr_en_speak(dev_batch, is_training=False)
+            en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
+            results, _ = eval_fr_en_stats(model, en_msg, en_msg_len, dev_batch,
+                                          en_lm=extra_input["en_lm"],
+                                          all_img=extra_input["img"]['multi30k'][1],
+                                          ranker=extra_input["ranker"])
+            if len(monitor_names) > 0:
+                eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
+
+        bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
+        stats = eval_metrics.__dict__['metrics']
+        stats['bleu_en'] = bleu_en[0]
+        return stats, en_hyp
+
+
 def main_loop(args, err_type):
+    # Tensorboard
+    from tensorboardX import SummaryWriter
+    from shutil import rmtree
+    tb_name = "{}_lr{}".format(err_type, args.fr_en_lr)
+    print('save result to <{}>'.format(tb_name))
+    if os.path.exists(tb_name):
+        rmtree(tb_name)
+    tb_writer = SummaryWriter(tb_name)
+
     # Reload model
     model = get_model(args)
     model.fr_en.load_state_dict(torch.load(args.fr_en_ckpt, map_location))
@@ -91,12 +129,11 @@ def main_loop(args, err_type):
 
     # Opt
     fr_en_opt = torch.optim.Adam(model.fr_en.parameters(), lr=args.fr_en_lr)
-    monitor_names = []
+    monitor_names = ['nll_real']
     monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
     monitor_names.extend(["r1_acc"])
     monitor_names.append('en_nll_lm')
 
-    statss = []
     eval_freq = min(max(int(args.fr_en_k2 / 30), 5), 50)
     iters = 0
     DAVID = 2464
@@ -108,8 +145,24 @@ def main_loop(args, err_type):
         if iters % eval_freq == 0:
             print('Record stats at {}'.format(iters))
             model.eval()
-            stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
-            statss.append((iters, stats))
+            stats, en_hyp = get_fr_en_stats(args, model, dev_it, monitor_names, extra_input)
+            for key, val in stats.items():
+                tb_writer.add_scalar(key, val, iters)
+
+            # Add DAVID stats
+            pos = []
+            no_david = 0
+            for hyp in en_hyp:
+                tokens = hyp.split()
+                for pos_id, token in enumerate(tokens):
+                    if token == 'david':
+                        pos.append(pos_id)
+                        break
+                else:
+                    pos.append(-1)
+                    no_david += 1
+            tb_writer.add_histogram('david position', pos, iters)
+            tb_writer.add_scalar('no_david', no_david, iters)
 
         # Train
         model.train()
@@ -141,16 +194,7 @@ def main_loop(args, err_type):
         nll.backward()
         fr_en_opt.step()
         iters += 1
-    from tensorboardX import SummaryWriter
-    from shutil import rmtree
-    name = "{}_lr{}".format(err_type, args.fr_en_lr)
-    print('save result to <{}>'.format(name))
-    if os.path.exists(name):
-        rmtree(name)
-    tb_writer = SummaryWriter(name)
-    for step, stats in statss:
-        for key, val in stats.items():
-            tb_writer.add_scalar(key, val, step)
+
     tb_writer.flush()
 
 
