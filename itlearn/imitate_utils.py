@@ -29,7 +29,12 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
         # Teacher fr_en generate message
         with torch.no_grad():
             teacher.eval()
-            en_msg, en_msg_len = teacher.fr_en_speak(batch)
+            if args.send_method == 'argmax':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=False)
+            elif args.send_method == 'gumbel':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=True)
+            else:
+                raise ValueError
             en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
 
         student.train()
@@ -88,8 +93,16 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt):
         # Teacher generate message
         with torch.no_grad():
             teacher.eval()
-            en_msg, de_msg, en_msg_len, de_msg_len = teacher.decode(batch)
+            if args.send_method == 'argmax':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=False)
+            elif args.send_method == 'gumbel':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=True)
+            else:
+                raise ValueError
             en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
+            en_hid = teacher.en_de.enc(en_msg, en_msg_len)
+            de_send_results = teacher.en_de.dec.send(en_hid, en_msg_len, batch.de[1] - 1, 'argmax')
+            de_msg, de_msg_len = [de_send_results[key] for key in ["msg", "new_seq_lens"]]
             de_msg, de_msg_len = _make_sure_message_valid(de_msg, de_msg_len, teacher.init_token)
 
         student.train()
