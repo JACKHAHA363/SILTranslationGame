@@ -29,8 +29,8 @@ from math import ceil
 import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc']
-NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1']
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
+NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -157,12 +157,12 @@ def main():
                 new_steps.append(step)
                 new_means.append(mean)
                 new_stds.append(std)
-                if step <= min_steps:
-                    new_steps.append(step)
-                    new_means.append(mean)
-                    new_stds.append(std)
-                else:
-                    break
+                #if step <= plot_steps:
+                #    new_steps.append(step)
+                #    new_means.append(mean)
+                #    new_stds.append(std)
+                #else:
+                #    break
             new_means = np.array(new_means)
             new_stds = np.array(new_stds)
             line, = ax.plot(new_steps, new_means)
