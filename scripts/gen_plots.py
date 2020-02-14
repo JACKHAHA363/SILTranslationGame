@@ -29,8 +29,8 @@ from math import ceil
 import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
-NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
+NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -170,6 +170,7 @@ def main():
             ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
                             alpha=0.2)
         ax.set_xlabel('steps', fontsize=20)
+        ax.set_title(NAMES[TAGS.index(tag)])
         ax.legend(fontsize=20)
         fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
 
