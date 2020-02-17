@@ -44,7 +44,7 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
             if model.train_en_lm:
                 en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
-            results.update({"en_nll_lm": en_nll_lm.mean()})
+            results.update({"en_nll_lm": -en_nll_lm.mean()})
         else:
             raise Exception()
 
