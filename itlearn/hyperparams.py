@@ -132,7 +132,7 @@ def get_hp_str(args):
                  "ann{}k_".format(args.linear_anneal_steps // 1000) + \
                  "{}".format("h{}_".format(args.h_co)) + \
                  "{}".format("enlm{}_".format(args.en_lm_nll_co)) + \
-                 "{}".format("imgpred_{}".format(args.img_pred_loss_co)) + \
+                 "{}".format("imgpred{}_".format(args.img_pred_loss_co)) + \
                  "gtemp{}_".format(args.gumbel_temp) + \
                  "drop{}_".format(args.drop_ratio) + \
                  "ratio{}_".format( args.msg_len_ratio ) + \
