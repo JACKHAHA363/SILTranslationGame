@@ -130,23 +130,9 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
     return dev_metrics
 
 
-def _base_train(args, model, iterators, extra_input, loop, is_a2c=False):
-    (train_it, dev_it) = iterators
+def _base_train(args, model, iterators, extra_input, loop, loss_names, loss_cos):
+    train_it, dev_it = iterators
     monitor_names = ['nll_real']
-    loss_names = ['ce_loss']
-    loss_cos = {"ce_loss": args.ce_co}
-
-    # Extra loss for a2c
-    if is_a2c:
-        loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
-        loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
-
-    # Monitor the entropy of gumbel but don't train
-    else:
-        args.logger.info("Don't train entropy but observe it")
-        loss_names.extend(['neg_Hs'])
-        loss_cos.update({'neg_Hs': 0.})
-
     if args.use_ranker:
         monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
         monitor_names.extend(["r1_acc"])
@@ -158,8 +144,31 @@ def _base_train(args, model, iterators, extra_input, loop, is_a2c=False):
 
 
 def train_a2c_model(args, model, iterators, extra_input, loop):
-    return _base_train(args, model, iterators, extra_input, loop, is_a2c=True)
+    loss_names = ['ce_loss']
+    loss_cos = {"ce_loss": args.ce_co}
+    loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
+    loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
+    return _base_train(args, model, iterators, extra_input, loop, loss_names, loss_cos)
 
 
 def train_gumbel_model(args, model, iterators, extra_input, loop):
-    return _base_train(args, model, iterators, extra_input, loop, is_a2c=False)
+    loss_names = ['ce_loss']
+    loss_cos = {"ce_loss": args.ce_co}
+
+    args.logger.info("Don't train entropy but observe it")
+    loss_names.extend(['neg_Hs'])
+    loss_cos.update({'neg_Hs': 0.})
+
+    # Use LM reward
+    if args.train_en_lm:
+        loss_names.extend(['en_nll_lm'])
+        loss_cos['en_nll_lm'] = args.en_lm_nll_co
+
+        # Use entropy coef as well. If KL then h_co = en_lm_nll_co
+        loss_cos['neg_Hs'] = args.h_co
+
+    if args.train_ranker:
+        img_pred_loss_name = "img_pred_loss_{}".format(args.img_pred_loss)
+        loss_names.extend([img_pred_loss_name])
+        loss_cos[img_pred_loss_name] = args.img_pred_loss_co
+    return _base_train(args, model, iterators, extra_input, loop, loss_names, loss_cos)
