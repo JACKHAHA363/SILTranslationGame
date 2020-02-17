@@ -158,7 +158,7 @@ class AgentsGumbel(BaseAgents):
         results = {}
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
         fr_en_results, _ = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
-                                            all_img=all_img, ranker=ranker)
+                                            all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
         results.update(fr_en_results)
 
         (de, de_len) = batch.de

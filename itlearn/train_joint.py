@@ -99,6 +99,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
 
         total_loss = 0
         for loss_name, loss in zip(loss_names, losses):
+            assert loss.grad_fn is not None
             total_loss += loss * loss_cos[loss_name]
 
         train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])

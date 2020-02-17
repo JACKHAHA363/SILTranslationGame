@@ -7,15 +7,26 @@ from misc.bleu import computeBLEU, print_bleu
 from utils import cuda, sum_reward
 
 
-def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None):
+def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
+                     use_gumbel_tokens=False):
     """ Evaluate this eng sentence with different metric. Can be used as reward """
     results = {}
     rewards = {}
     batch_size = en_msg.shape[0]
     # NOTE add <BOS> to beginning
     en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), model.init_token)).long(), en_msg], dim=1)
+    gumbel_tokens = None
+    if use_gumbel_tokens:
+        gumbel_tokens = model.fr_en.dec.gumbel_tokens
+        init_tokens = torch.zeros([gumbel_tokens.shape[0], 1, gumbel_tokens.shape[2]])
+        init_tokens = init_tokens.to(device=gumbel_tokens.device)
+        init_tokens[:, :, model.init_token] = 1
+        gumbel_tokens = torch.cat([init_tokens, gumbel_tokens], dim=1)
+
     if model.use_en_lm:  # monitor EN LM NLL
         if "wiki" in model.en_lm_dataset:
+            if use_gumbel_tokens:
+                raise NotImplementedError
             en_nll_lm = en_lm.get_nll(en_msg_)  # (batch_size, en_msg_len)
             if model.train_en_lm:
                 en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
@@ -24,7 +35,12 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
             results.update({"en_nll_lm": en_nll_lm.mean()})
 
         elif model.en_lm_dataset in ["coco", "multi30k"]:
-            en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
+            if use_gumbel_tokens:
+                en_lm.train()
+                en_nll_lm = en_lm.get_loss_oh(gumbel_tokens, None)
+                en_lm.eval()
+            else:
+                en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
             if model.train_en_lm:
                 en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
                 rewards['lm'] = -1 * en_nll_lm.detach()
@@ -33,6 +49,8 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
             raise Exception()
 
     if model.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
+        if use_gumbel_tokens and model.train_ranker:
+            raise NotImplementedError
         ranker.eval()
         img = cuda(all_img.index_select(dim=0, index=batch.idx.cpu()))  # (batch_size, D_img)
 
@@ -161,14 +179,17 @@ def train_gumbel_model(args, model, iterators, extra_input, loop):
 
     # Use LM reward
     if args.train_en_lm:
+        args.logger.info('Train with LM reward {}'.format(args.en_lm_nll_co))
         loss_names.extend(['en_nll_lm'])
         loss_cos['en_nll_lm'] = args.en_lm_nll_co
 
         # Use entropy coef as well. If KL then h_co = en_lm_nll_co
+        args.logger.info('Train entropy with {}'.format(args.h_co))
         loss_cos['neg_Hs'] = args.h_co
 
     if args.train_ranker:
         img_pred_loss_name = "img_pred_loss_{}".format(args.img_pred_loss)
+        args.logger.info('Train with grounding reward')
         loss_names.extend([img_pred_loss_name])
         loss_cos[img_pred_loss_name] = args.img_pred_loss_co
     return _base_train(args, model, iterators, extra_input, loop, loss_names, loss_cos)

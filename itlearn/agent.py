@@ -234,7 +234,7 @@ class ImageCaptioning(ArgsModule):
         self.voc_sz = voc_sz
 
     def forward(self, msg, img):
-        # msg : (batch_size, seq_len)
+        # msg : (batch_size, seq_len) or (batch_size, seq_len, vocab_size)
         # img : (batch_size, D_img)
         batch_size = msg.size(0)
         if self.no_img:
@@ -246,7 +246,13 @@ class ImageCaptioning(ArgsModule):
             hidden = self.img_enc( img )[None,:,:] # (1, batch_size, D_hid)
             hidden = hidden.repeat(self.n_layers, 1, 1)
         input, target = msg[:,:-1], msg[:,1:]
-        emb = F.dropout( self.encoder( input ), p=self.drop_ratio, training=self.training )
+        if len(input.shape) == 2:
+            emb = F.dropout(self.encoder( input ), p=self.drop_ratio, training=self.training)
+        elif len(input.shape) == 3:
+            emb = torch.matmul(input, self.encoder.weight)
+            emb = F.dropout(emb, p=self.drop_ratio, training=self.training)
+        else:
+            raise ValueError
         output, _ = self.rnn(emb, (hidden, hidden))
         output = F.dropout( output, p=self.drop_ratio, training=self.training )
         decoded = self.decoder(output).view(-1, self.voc_sz)
@@ -260,3 +266,16 @@ class ImageCaptioning(ArgsModule):
             loss = F.cross_entropy( decoded, target.view(-1), ignore_index=0, reduction='none' )
             loss = loss.view(batch_size, -1) # (batch_size, seq_len)
         return loss
+
+    def get_loss_oh(self, msg_oh, img):
+        """
+        :param msg_oh: [bsz, len, vocab_size]
+        """
+        batch_size = msg_oh.size(0)
+        input, target = msg_oh[:, :-1], msg_oh[:, 1:].contiguous()  # (batch_size, seq_len) x 2
+        target = torch.argmax(target, dim=-1)
+        decoded = self.forward(msg_oh, img)
+        loss = F.cross_entropy(decoded, target.view(-1), ignore_index=0, reduction='none')
+        loss = loss.view(batch_size, -1)  # (batch_size, seq_len)
+        return loss
+
