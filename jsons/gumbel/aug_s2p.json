@@ -55,6 +55,6 @@
     "debug": false,
     "plot_grad": false,
     "early_stop": false,
-    "s2p_freq": 10,
-    "s2p_co": 0.1
+    "s2p_freq": 1,
+    "s2p_co": 1
 }
