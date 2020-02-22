@@ -6,7 +6,7 @@ from metrics import Metrics
 from misc.bleu import computeBLEU
 from utils import cuda
 
-__all__ = ['imitate_fr_en', 'imitate_en_de',
+__all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
 
 
@@ -72,11 +72,43 @@ def get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input):
         return stats
 
 
+def finetune_en_de(args, student, teacher, train_it, dev_it, opt):
+    """ Perform finetuning """
+    args.logger.info('Finetune en de')
+    imitate_statss = []
+    eval_freq = max(int(args.en_de_k2 / 50), 5)
+    for iters, batch in enumerate(train_it):
+        if iters >= args.en_de_k2:
+            args.logger.info('student en de stop finetuning after {} steps'.format(args.en_de_k2))
+            break
+
+        if args.save_imitate_stats and iters % eval_freq == 0:
+            args.logger.info('Record imitate stats at {}'.format(iters))
+            student.eval()
+            stats = get_en_de_imitate_stats(args, student, dev_it)
+            imitate_statss.append((iters, stats))
+
+        # Teacher generate message
+        with torch.no_grad():
+            teacher.eval()
+            if args.send_method == 'argmax':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=False)
+            elif args.send_method == 'gumbel':
+                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=True)
+            else:
+                raise ValueError
+            en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
+
+        student.train()
+        nll = _get_imitate_loss(0, student.en_de, teacher.en_de, en_msg, en_msg_len, batch.de[0])
+        opt.zero_grad()
+        nll.backward()
+        opt.step()
+    return imitate_statss
+
+
 def imitate_en_de(args, student, teacher, train_it, dev_it, opt):
-    if not args.en_de_finetune:
-        args.logger.info('Imitate fr en!')
-    else:
-        args.logger.info('Finetune en de')
+    args.logger.info('Imitate fr en!')
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     for iters, batch in enumerate(train_it):
