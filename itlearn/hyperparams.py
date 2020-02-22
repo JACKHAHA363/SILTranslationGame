@@ -89,7 +89,7 @@ def save_dict_to_json(d, json_path):
 
 
 def itlearn_str(args):
-    hp_str = "sameopt_{}_finetune{}_".format(args.same_opt, args.en_de_finetune) + \
+    hp_str = "sameopt_{}_endefinetune{}_frens2p{}_".format(args.same_opt, args.en_de_finetune, args.fr_en_s2p) + \
              "k1{}_".format(args.k1) + \
              "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
              "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \
@@ -97,7 +97,7 @@ def itlearn_str(args):
     return hp_str
 
 def get_hp_str(args):
-    if args.setup == "joint" or args.setup == 'aug_s2p':
+    if args.setup == "joint":
         hp_str = "{}_".format(args.setup) + \
                  "seed{}_".format(args.seed) + \
                  "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\
