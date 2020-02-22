@@ -59,7 +59,7 @@
     "save_imitate_stats": false,
     "same_opt": true,
     "en_de_finetune": true,
-    "fr_en_s2p": false,
+    "fr_en_s2p": true,
     "k1": 4000,
     "fr_en_k2": 400,
     "fr_en_temp": 0,
