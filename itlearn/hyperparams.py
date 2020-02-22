@@ -97,7 +97,7 @@ def itlearn_str(args):
     return hp_str
 
 def get_hp_str(args):
-    if args.setup == "joint" or args.setup == 'aug_s2p':
+    if args.setup == "joint":
         hp_str = "{}_".format(args.setup) + \
                  "seed{}_".format(args.seed) + \
                  "{}".format( "ce{}_pg{}_b{}_".format(args.ce_co, args.pg_co, args.b_co) ) +\

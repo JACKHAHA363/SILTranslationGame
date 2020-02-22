@@ -37,7 +37,7 @@ if 'out' not in parsed_args:
 
 args.update(parsed_args)
 
-JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn', 'aug_s2p']
+JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn']
 folders = ["event", "model", "log", "param"]
 if args.setup in ['single'] + JOINT_SETUPS:
     folders.append('decoding')
