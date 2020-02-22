@@ -1,3 +1,6 @@
+"""
+Same as S2P but using fake label instead of real label
+"""
 from torch import nn as nn
 import torch
 from pathlib import Path
@@ -129,20 +132,6 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
                      iters, prefix="train/")
             write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
             train_metrics.reset()
-
-
-def s2p_batch(fr_en_it, en_de_it, agents):
-    fr_en_batch = fr_en_it.__next__()
-    en_de_batch = en_de_it.__next__()
-    fr_en_loss = _get_nll(agents.fr_en,
-                          fr_en_batch.src[0],
-                          fr_en_batch.src[1],
-                          fr_en_batch.trg[0])
-    en_de_loss = _get_nll(agents.en_de,
-                          en_de_batch.src[0],
-                          en_de_batch.src[1],
-                          en_de_batch.trg[0])
-    return fr_en_loss, en_de_loss
 
 
 def _get_nll(model, src, src_len, trg):
