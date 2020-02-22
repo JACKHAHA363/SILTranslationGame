@@ -6,8 +6,37 @@ from metrics import Metrics
 from misc.bleu import computeBLEU
 from utils import cuda
 
-__all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
+__all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de', 's2p_fr_en',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
+
+
+def s2p_fr_en(args, student, dev_it, monitor_names, extra_input, opt):
+    """ S2P speaker """
+    args.logger.info('S2P fr en!')
+    imitate_statss = []
+    eval_freq = max(int(args.fr_en_k2 / 50), 5)
+    s2p_fr_en_it = extra_input['s2p_its']['fr-en']
+    for iters, batch in enumerate(s2p_fr_en_it):
+        if iters >= args.fr_en_k2:
+            args.logger.info('student fr en stop learning after {} training steps'.format(args.fr_en_k2))
+            break
+
+        if args.save_imitate_stats and iters % eval_freq == 0:
+            args.logger.info('Record imitate stats at {}'.format(iters))
+            student.eval()
+            stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
+            imitate_statss.append((iters, stats))
+
+        student.train()
+        src, src_len = batch.src
+        trg = batch.trg[0]
+        logits, _ = student.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
+        nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                                reduction='mean', ignore_index=0)
+        opt.zero_grad()
+        nll.backward()
+        opt.step()
+    return imitate_statss
 
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):

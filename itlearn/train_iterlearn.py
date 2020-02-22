@@ -12,7 +12,8 @@ from agents_utils import eval_model, valid_model
 import os
 from pandas import DataFrame
 from pathlib import Path
-from imitate_utils import imitate_fr_en, imitate_en_de, get_fr_en_imitate_stats, get_en_de_imitate_stats, finetune_en_de
+from imitate_utils import imitate_fr_en, imitate_en_de, s2p_fr_en, \
+    get_fr_en_imitate_stats, get_en_de_imitate_stats, finetune_en_de
 
 
 def get_lr_anneal(args, iters):
@@ -143,8 +144,9 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                                              dev_it=dev_it, monitor_names=monitor_names,
                                              extra_input=extra_input, opt=stu_fr_en_opt)
             else:
-                raise NotImplementedError
-
+                fr_en_statss = s2p_fr_en(args, student=student,
+                                         dev_it=dev_it, monitor_names=monitor_names,
+                                         extra_input=extra_input, opt=stu_fr_en_opt)
 
             if not args.en_de_finetune:
                 en_de_statss = imitate_en_de(args, student=student,
