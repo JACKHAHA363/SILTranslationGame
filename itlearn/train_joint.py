@@ -70,9 +70,6 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             args.logger.info('model:' + args.prefix + args.hp_str)
             best.accumulate(bleu_de[0], bleu_en[0], iters)
             args.logger.info(best)
-            if args.early_stop and (iters - best.iters) // args.eval_every > args.patience:
-                args.logger.info("Early stopping.")
-                break
 
         model.train()
 

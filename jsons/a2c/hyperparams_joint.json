@@ -65,5 +65,4 @@
 
     "debug": false,
     "plot_grad": false,
-    "early_stop": false
 }

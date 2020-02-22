@@ -55,7 +55,6 @@
     "msg_len_ratio": -1.0,
     "debug": false,
     "plot_grad": false,
-    "early_stop": false,
     "save_imitate_stats": false,
     "same_opt": true,
     "en_de_finetune": true,
