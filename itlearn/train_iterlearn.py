@@ -141,6 +141,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                                              dev_it=dev_it, monitor_names=monitor_names,
                                              extra_input=extra_input, opt=stu_fr_en_opt)
             else:
+                # Don't reset speaker
+                student.load_state_dict(model.state_dict())
                 fr_en_statss = s2p_fr_en(args, student=student,
                                          dev_it=dev_it, monitor_names=monitor_names,
                                          extra_input=extra_input, opt=stu_fr_en_opt)
