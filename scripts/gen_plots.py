@@ -84,7 +84,10 @@ def parse_tb_event_file(event_file):
             if tag in TAGS:
                 if data.get(tag) is None:
                     data[tag] = Series()
-                data[tag].add(step=e.step, val=v.simple_value)
+                if 'nll' in tag:
+                    data[tag].add(step=e.step, val=np.abs(v.simple_value))
+                else:
+                    data[tag].add(step=e.step, val=v.simple_value)
 
     for tag in data:
         data[tag].verify()
