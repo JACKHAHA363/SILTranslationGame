@@ -12,8 +12,8 @@ from agents_utils import eval_model, valid_model
 import os
 from pandas import DataFrame
 from pathlib import Path
-from imitate_utils import imitate_fr_en, imitate_en_de, s2p_fr_en, \
-    get_fr_en_imitate_stats, get_en_de_imitate_stats, finetune_en_de
+from imitate_utils import imitate_fr_en, imitate_en_de, get_fr_en_imitate_stats, \
+    get_en_de_imitate_stats, finetune_en_de
 
 
 def get_lr_anneal(args, iters):
@@ -135,15 +135,10 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
             old_student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
             model.eval()
             stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
-            if not args.fr_en_s2p:
-                fr_en_statss = imitate_fr_en(args, student=student,
-                                             teacher=model, train_it=train_it,
-                                             dev_it=dev_it, monitor_names=monitor_names,
-                                             extra_input=extra_input, opt=stu_fr_en_opt)
-            else:
-                # Don't reset speaker
-                student.load_state_dict(model.state_dict())
-                fr_en_statss = s2p_fr_en(args, student=student,
+            if not args.fr_en_reset:
+                student.fr_en.load_state_dict(model.fr_en.state_dict())
+            fr_en_statss = imitate_fr_en(args, student=student,
+                                         teacher=model, train_it=train_it,
                                          dev_it=dev_it, monitor_names=monitor_names,
                                          extra_input=extra_input, opt=stu_fr_en_opt)
 
