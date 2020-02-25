@@ -1,50 +1,54 @@
 import torch
 from torch.nn import functional as F
+import random
 
 from agents_utils import eval_fr_en_stats
 from metrics import Metrics
 from misc.bleu import computeBLEU
 from utils import cuda
 
-__all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de', 's2p_fr_en',
+__all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
 
 
-def s2p_fr_en(args, student, dev_it, monitor_names, extra_input, opt):
-    """ S2P speaker """
-    args.logger.info('S2P fr en!')
-    imitate_statss = []
-    eval_freq = max(int(args.fr_en_k2 / 50), 5)
-    s2p_fr_en_it = extra_input['s2p_its']['fr-en']
-    for iters, batch in enumerate(s2p_fr_en_it):
-        if iters >= args.fr_en_k2:
-            args.logger.info('student fr en stop learning after {} training steps'.format(args.fr_en_k2))
-            break
+def _fr_en_s2p(batch, opt, student):
+    student.train()
+    src, src_len = batch.src
+    trg = batch.trg[0]
+    logits, _ = student.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
+    nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                            reduction='mean', ignore_index=0)
+    opt.zero_grad()
+    nll.backward()
+    opt.step()
 
-        if args.save_imitate_stats and iters % eval_freq == 0:
-            args.logger.info('Record imitate stats at {}'.format(iters))
-            student.eval()
-            stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
-            imitate_statss.append((iters, stats))
 
-        student.train()
-        src, src_len = batch.src
-        trg = batch.trg[0]
-        logits, _ = student.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
-        nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
-                                                reduction='mean', ignore_index=0)
-        opt.zero_grad()
-        nll.backward()
-        opt.step()
-    return imitate_statss
+def _fr_en_imitate_step(args, batch, opt, student, teacher):
+    with torch.no_grad():
+        teacher.eval()
+        if args.send_method == 'argmax':
+            en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=False)
+        elif args.send_method == 'gumbel':
+            en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=True)
+        else:
+            raise ValueError
+        en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
+    student.train()
+    nll = _get_imitate_loss(args.fr_en_temp, student.fr_en, teacher.fr_en, batch.fr[0], batch.fr[1], en_msg)
+    opt.zero_grad()
+    nll.backward()
+    opt.step()
 
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):
     """ Imitate speake """
-    args.logger.info('Imitate fr en!')
+    args.logger.info('Fr En: Imitate {} S2P {}'.format(1 - args.fr_en_s2p_ratio,
+                                                       args.fr_en_s2p_ratio))
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
-    for iters, batch in enumerate(train_it):
+    iters = 0
+    s2p_fr_en_it = extra_input['s2p_its']['fr-en']
+    while True:
         if iters >= args.fr_en_k2:
             args.logger.info('student fr en stop learning after {} training steps'.format(args.fr_en_k2))
             break
@@ -55,22 +59,15 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
             stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
             imitate_statss.append((iters, stats))
 
-        # Teacher fr_en generate message
-        with torch.no_grad():
-            teacher.eval()
-            if args.send_method == 'argmax':
-                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=False)
-            elif args.send_method == 'gumbel':
-                en_msg, en_msg_len = teacher.fr_en_speak(batch, is_training=True)
-            else:
-                raise ValueError
-            en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
-
-        student.train()
-        nll = _get_imitate_loss(args.fr_en_temp, student.fr_en, teacher.fr_en, batch.fr[0], batch.fr[1], en_msg)
-        opt.zero_grad()
-        nll.backward()
-        opt.step()
+        if random.random() < args.fr_en_s2p_ratio:
+            # Fr En S2P Update
+            batch = s2p_fr_en_it.__next__()
+            _fr_en_s2p(batch, opt, student)
+        else:
+            # Fr En Itlearn Update
+            batch = train_it.__next__()
+            _fr_en_imitate_step(args, batch, opt, student, teacher)
+        iters += 1
     return imitate_statss
 
 
