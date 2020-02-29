@@ -47,7 +47,8 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
-    s2p_fr_en_it = extra_input['s2p_its']['fr-en']
+    s2p_fr_en_it = iter(extra_input['s2p_its']['fr-en'])
+    train_it = iter(train_it)
     while True:
         if iters >= args.fr_en_k2:
             args.logger.info('student fr en stop learning after {} training steps'.format(args.fr_en_k2))
@@ -58,7 +59,7 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
             student.eval()
             stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
             imitate_statss.append((iters, stats))
-
+        
         if random.random() < args.fr_en_s2p_ratio:
             # Fr En S2P Update
             batch = s2p_fr_en_it.__next__()
