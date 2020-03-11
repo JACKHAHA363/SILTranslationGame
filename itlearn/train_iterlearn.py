@@ -27,7 +27,7 @@ def get_h_co_anneal(args, iters):
 
 
 def selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
-                  train_metrics, writer):
+                  train_metrics, writer, s2p_fr_en_it, s2p_en_de_it):
     """ Perform a step of selfplay """
     if hasattr(args, 'lr_anneal') and args.lr_anneal == "linear":
         opt.param_groups[0]['lr'] = get_lr_anneal(args, iters)
@@ -42,6 +42,12 @@ def selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor
     for loss_name, loss in zip(loss_names, losses):
         total_loss += loss * loss_cos[loss_name]
     train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
+
+    # Add S2P Grad
+    if args.s2p_freq > 0 and iters % args.s2p_freq == 0:
+        fr_en_loss, en_de_loss = s2p_batch(s2p_fr_en_it, s2p_en_de_it, model)
+        total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
+
     total_loss.backward()
     if args.plot_grad:
         plot_grad(writer, model, iters)
@@ -89,6 +95,14 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         student.cuda(args.gpu)
     stu_fr_en_opt, stu_en_de_opt = None, None
 
+    # S2P
+    s2p_fr_en_it, s2p_en_de_it = None, None
+    if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
+        args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
+        s2p_fr_en_it, s2p_en_de_it = extra_input['s2p_its']['fr-en'], extra_input['s2p_its']['en-de']
+        s2p_fr_en_it = iter(s2p_fr_en_it)
+        s2p_en_de_it = iter(s2p_en_de_it)
+
     # Determine when to stop iterlearn
     max_itlearn_steps = args.max_itlearn_steps if args.max_itlearn_steps > 0 else args.max_training_steps
     for iters, train_batch in enumerate(train_it):
@@ -126,7 +140,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
 
         model.train()
         selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
-                      train_metrics, writer)
+                      train_metrics, writer, s2p_fr_en_it=s2p_fr_en_it,
+                      s2p_en_de_it=s2p_en_de_it)
 
         if (iters + 1) % args.k1 == 0 and (iters + 1) < max_itlearn_steps:
             args.logger.info('start imitating at iters {}'.format(iters + 1))
@@ -211,3 +226,24 @@ def get_student_opts(args, student, student_opts=None):
         en_de_opt = torch.optim.Adam(student.en_de.parameters(), betas=(0.9, 0.98),
                                      eps=1e-9, lr=args.en_de_lr)
         return fr_en_opt, en_de_opt
+
+
+def s2p_batch(fr_en_it, en_de_it, agents):
+    fr_en_batch = fr_en_it.__next__()
+    en_de_batch = en_de_it.__next__()
+    fr_en_loss = _get_nll(agents.fr_en,
+                          fr_en_batch.src[0],
+                          fr_en_batch.src[1],
+                          fr_en_batch.trg[0])
+    en_de_loss = _get_nll(agents.en_de,
+                          en_de_batch.src[0],
+                          en_de_batch.src[1],
+                          en_de_batch.trg[0])
+    return fr_en_loss, en_de_loss
+
+
+def _get_nll(model, src, src_len, trg):
+    logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
+    loss = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                             reduction='mean', ignore_index=0)
+    return loss

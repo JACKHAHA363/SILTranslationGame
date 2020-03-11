@@ -145,6 +145,7 @@ def get_hp_str(args):
         hp_str = "seed{}_".format(args.seed) + \
                  "lr{:.0e}_".format(args.lr) + \
                  "gtemp{}_".format(args.gumbel_temp) + \
+                 "s2pfreq{}_s2p{}_".format(args.s2p_freq, args.s2p_co) + \
                  "lenratio{}_".format(args.msg_len_ratio) + itlearn_str(args)
 
     elif args.setup == "single":
