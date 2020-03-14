@@ -11,19 +11,17 @@ __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
 
 
-def _fr_en_s2p(batch, opt, student):
+def _fr_en_s2p(batch, student):
     student.train()
     src, src_len = batch.src
     trg = batch.trg[0]
     logits, _ = student.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
     nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
                                             reduction='mean', ignore_index=0)
-    opt.zero_grad()
-    nll.backward()
-    opt.step()
+    return nll
 
 
-def _fr_en_imitate_step(args, batch, opt, student, teacher):
+def _fr_en_imitate_step(args, batch, student, teacher):
     with torch.no_grad():
         teacher.eval()
         if args.send_method == 'argmax':
@@ -35,9 +33,7 @@ def _fr_en_imitate_step(args, batch, opt, student, teacher):
         en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
     student.train()
     nll = _get_imitate_loss(args.fr_en_temp, student.fr_en, teacher.fr_en, batch.fr[0], batch.fr[1], en_msg)
-    opt.zero_grad()
-    nll.backward()
-    opt.step()
+    return nll
 
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):
@@ -59,15 +55,31 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
             student.eval()
             stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
             imitate_statss.append((iters, stats))
-        
-        if random.random() < args.fr_en_s2p_ratio:
-            # Fr En S2P Update
+
+        # This mode of S2P will use probability to do separate update
+        if args.fr_en_s2p_mode == 'prob':
+            if random.random() < args.fr_en_s2p_ratio:
+                # Fr En S2P Update
+                batch = s2p_fr_en_it.__next__()
+                loss = _fr_en_s2p(batch, student)
+            else:
+                # Fr En Itlearn Update
+                batch = train_it.__next__()
+                loss = _fr_en_imitate_step(args, batch, student, teacher)
+
+        elif args.fr_en_s2p_mode == 'interp':
             batch = s2p_fr_en_it.__next__()
-            _fr_en_s2p(batch, opt, student)
-        else:
-            # Fr En Itlearn Update
+            s2p_loss = _fr_en_s2p(batch, student)
             batch = train_it.__next__()
-            _fr_en_imitate_step(args, batch, opt, student, teacher)
+            sil_loss = _fr_en_imitate_step(args, batch, student, teacher)
+            loss = args.fr_en_s2p_ratio * s2p_loss + (1 - args.fr_en_s2p_ratio) * sil_loss
+        else:
+            raise ValueError
+
+        # opt step
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
         iters += 1
     return imitate_statss
 

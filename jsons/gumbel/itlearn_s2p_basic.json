@@ -68,6 +68,6 @@
     "en_de_k2": 400,
     "en_de_temp": 1,
     "en_de_lr": 0.0001,
-    "s2p_freq": -1,
-    "s2p_co": 0
+    "s2p_freq": 1,
+    "s2p_co": 1
 }
