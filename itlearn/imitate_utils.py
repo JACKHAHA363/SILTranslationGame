@@ -11,11 +11,21 @@ __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
 
 
-def _fr_en_s2p(batch, student):
-    student.train()
+def _fr_en_s2p_iwslt(batch, model):
+    model.train()
     src, src_len = batch.src
     trg = batch.trg[0]
-    logits, _ = student.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
+    logits, _ = model.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
+    nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                            reduction='mean', ignore_index=0)
+    return nll
+
+
+def _fr_en_s2p_multi30k(batch, model):
+    model.train()
+    (fr, fr_len) = batch.fr
+    (en, _) = batch.en
+    logits, _ = model.fr_en(batch.fr[:, 1:], fr_len - 1, en[:, :1-1])
     nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
                                             reduction='mean', ignore_index=0)
     return nll
@@ -59,17 +69,30 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
         # This mode of S2P will use probability to do separate update
         if args.fr_en_s2p_mode == 'prob':
             if random.random() < args.fr_en_s2p_ratio:
-                # Fr En S2P Update
-                batch = s2p_fr_en_it.__next__()
-                loss = _fr_en_s2p(batch, student)
+                # Use labeled data
+                if args.fr_en_s2p_dataset == 'iwslt':
+                    batch = s2p_fr_en_it.__next__()
+                    loss = _fr_en_s2p_iwslt(batch, student)
+                elif args.fr_en_s2p_dataset == 'multi30k':
+                    batch = train_it.__next__()
+                    loss = _fr_en_s2p_multi30k(batch, student)
+                else:
+                    raise ValueError
             else:
-                # Fr En Itlearn Update
+                # Imitate
                 batch = train_it.__next__()
                 loss = _fr_en_imitate_step(args, batch, student, teacher)
 
         elif args.fr_en_s2p_mode == 'interp':
-            batch = s2p_fr_en_it.__next__()
-            s2p_loss = _fr_en_s2p(batch, student)
+            if args.fr_en_s2p_dataset == 'iwslt':
+                batch = s2p_fr_en_it.__next__()
+                s2p_loss = _fr_en_s2p_iwslt(batch, student)
+            elif args.fr_en_s2p_dataset == 'multi30k':
+                batch = train_it.__next__()
+                s2p_loss = _fr_en_s2p_multi30k(batch, student)
+            else:
+                raise ValueError
+
             batch = train_it.__next__()
             sil_loss = _fr_en_imitate_step(args, batch, student, teacher)
             loss = args.fr_en_s2p_ratio * s2p_loss + (1 - args.fr_en_s2p_ratio) * sil_loss
