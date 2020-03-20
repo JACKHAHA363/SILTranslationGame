@@ -38,8 +38,8 @@ def _fr_en_imitate_step(args, batch, student, teacher):
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):
     """ Imitate speake """
-    args.logger.info('Fr En: Imitate {} S2P {}'.format(1 - args.fr_en_s2p_ratio,
-                                                       args.fr_en_s2p_ratio))
+    args.logger.info('Fr En: Imitate: {}% S2P: {}% mode: {}'.format((1 - args.fr_en_s2p_ratio)*100,
+                                                                    args.fr_en_s2p_ratio*100, args.fr_en_s2p_mode))
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
