@@ -25,7 +25,7 @@ def _fr_en_s2p_multi30k(batch, model):
     model.train()
     (fr, fr_len) = batch.fr
     (en, _) = batch.en
-    logits, _ = model.fr_en(batch.fr[:, 1:], fr_len - 1, en[:, :1-1])
+    logits, _ = model.fr_en(fr[:, 1:], fr_len - 1, en[:, :-1])
     nll = torch.nn.functional.cross_entropy(logits, en[:, 1:].contiguous().view(-1),
                                             reduction='mean', ignore_index=0)
     return nll
