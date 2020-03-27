@@ -141,6 +141,14 @@ if args.setup in JOINT_SETUPS and hasattr(model, 'fr_en') and hasattr(model, 'en
                 param.requires_grad = False
             args.logger.info("Fixed FR->EN agent")
 
+
+# Resume from checkpoint
+if hasattr(args, 'resume') and args.resume is not None:
+    _, resume_path = get_ckpt_paths(args.exp_dir, args.resume, "best")
+    model.load_state_dict(torch.load(resume_path, map_location))
+    args.logger.info("Loading checkpoint : {}".format(resume_path))
+
+
 args.logger.info(str(model))
 
 # Params
