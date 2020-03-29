@@ -29,8 +29,11 @@ from math import ceil
 import math
 
 # The Tags that I care about
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
-NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
+#TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
+#NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
+
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
+NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -94,10 +97,45 @@ def parse_tb_event_file(event_file):
     return data
 
 
+def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size):
+    data = {}
+    min_steps = math.inf
+    for exp_name in exp_names:
+        steps, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
+        data[exp_name] = (steps, means, stds)
+        if steps[-1] < min_steps:
+            min_steps = steps[-1]
+    # Use Plot until max_steps + 10k
+    for exp_name in exp_names:
+        steps, means, stds = data[exp_name]
+        plot_steps = min(max_steps[exp_name] + 1000, steps[-1])
+        new_steps, new_means, new_stds = [], [], []
+        for step, mean, std in zip(steps, means, stds):
+            new_steps.append(step)
+            new_means.append(mean)
+            new_stds.append(std)
+            # if step <= plot_steps:
+            #    new_steps.append(step)
+            #    new_means.append(mean)
+            #    new_stds.append(std)
+            # else:
+            #    break
+        new_means = np.array(new_means)
+        new_stds = np.array(new_stds)
+        line, = ax.plot(new_steps, new_means)
+        line.set_label(exp_name)
+        ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
+                        alpha=0.2)
+    ax.set_xlabel('steps', fontsize=font_size)
+    ax.set_title(NAMES[TAGS.index(tag)])
+    ax.legend(fontsize=20)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('exp_dir')
     parser.add_argument('output_dir')
+    parser.add_argument('-same_canvas', action='store_true')
     args = parser.parse_args()
 
     exp_names = os.listdir(args.exp_dir)
@@ -117,14 +155,12 @@ def main():
             all_tags = list(run_data.keys())
             all_data[exp_name].append(run_data)
 
-
     # Get table
     from pandas import DataFrame
     df = DataFrame(columns=all_tags)
     max_steps = {}
     for exp_name in exp_names:
-        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]]
-                                              for run_data in all_data[exp_name]])
+        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]] for run_data in all_data[exp_name]])
         max_id = np.argmax(mean_de_bleus)
         max_step = steps[max_id]
         max_steps[exp_name] = max_step
@@ -137,45 +173,22 @@ def main():
     print(df)
 
     # Start plotting
-    matplotlib.rc('font', size=20)
-    for tag in all_tags:
-        fig, ax = plt.subplots(figsize=(8, 7))
-        plt.xticks(fontsize=20)
-        plt.yticks(fontsize=20)
-        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-        data = {}
-        min_steps = math.inf
-        for exp_name in exp_names:
-            steps, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
-            data[exp_name] = (steps, means, stds)
-            if steps[-1] < min_steps:
-                min_steps = steps[-1]
-
-        # Use Plot until max_steps + 10k
-        for exp_name in exp_names:
-            steps, means, stds = data[exp_name]
-            plot_steps = min(max_steps[exp_name] + 1000, steps[-1])
-            new_steps, new_means, new_stds = [], [], []
-            for step, mean, std in zip(steps, means, stds):
-                new_steps.append(step)
-                new_means.append(mean)
-                new_stds.append(std)
-                #if step <= plot_steps:
-                #    new_steps.append(step)
-                #    new_means.append(mean)
-                #    new_stds.append(std)
-                #else:
-                #    break
-            new_means = np.array(new_means)
-            new_stds = np.array(new_stds)
-            line, = ax.plot(new_steps, new_means)
-            line.set_label(exp_name)
-            ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
-                            alpha=0.2)
-        ax.set_xlabel('steps', fontsize=20)
-        ax.set_title(NAMES[TAGS.index(tag)])
-        ax.legend(fontsize=20)
-        fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
+    if args.same_canvas:
+        matplotlib.rc('font', size=18)
+        fig, axs = plt.subplots(int(len(all_tags)/2) + 1, 2, figsize=(8*(int(len(all_tags)/2) + 1), 20))
+        for tag, ax in zip(all_tags, axs.reshape([-1])):
+            ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10)
+        fig.savefig(os.path.join(args.output_dir, 'result.png'))
+    else:
+        matplotlib.rc('font', size=20)
+        for tag in all_tags:
+            fig, ax = plt.subplots(figsize=(8, 7))
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=20)
+            fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
 
 
 if __name__ == '__main__':
