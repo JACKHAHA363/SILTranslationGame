@@ -43,7 +43,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
             break
 
-        if not args.debug and hasattr(args, 'save_at') and iters in args.save_at:
+        if not args.debug and iters % args.save_every == 0:
             args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
             with torch.cuda.device(args.gpu):
                 torch.save(model.state_dict(), '{}_iter={}.pt'.format(args.model_path + args.id_str, iters))

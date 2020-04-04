@@ -16,7 +16,7 @@ SLURM_FILE = os.path.join(os.path.dirname(PROJ_PATH), 'scripts', 'run_cc.sh')
 print('train_script', SCRIPT_PATH)
 print('python bin', PYBIN)
 print('slurm run file', SLURM_FILE)
-EXCLUDES = ['save_at']
+EXCLUDES = ['save_every']
 
 SLURM_OPTION = ['sbatch', SLURM_FILE]
 

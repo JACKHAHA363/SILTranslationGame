@@ -19,7 +19,7 @@
     "input_feeding": false,
 
     "eval_every": 200,
-    "save_at": [],
+    "save_every": 1000,
     "early_stop": false,
     "patience": -1,
     "batch_size": 256,
