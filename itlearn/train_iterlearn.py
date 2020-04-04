@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from utils.misc import write_tb, plot_grad
-from metrics import Metrics, Best
+from utils.metrics import Metrics, Best
 from run_utils import get_model
 import matplotlib.pyplot as plt
 from agents_utils import eval_model, valid_model

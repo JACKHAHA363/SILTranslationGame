@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from utils.misc import write_tb, plot_grad, cuda
-from metrics import Metrics, Best
+from utils.metrics import Metrics, Best
 
 
 def valid_model(args, model, dev_it, dev_metrics, iters, loss_names, monitor_names, extra_input):

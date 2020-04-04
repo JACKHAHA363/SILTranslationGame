@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from metrics import Metrics
+from utils.metrics import Metrics
 from utils.bleu import computeBLEU, print_bleu
 from utils.misc import cuda, sum_reward
 

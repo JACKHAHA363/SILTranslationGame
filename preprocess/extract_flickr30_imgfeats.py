@@ -1,11 +1,9 @@
-import torch
-from itlearn.img_utils import ImageFolderWithPaths, preprocess_rc, normf
+from itlearn.utils.img import ImageFolderWithPaths, preprocess_rc, normf
 from tqdm import tqdm
 import sys
 import argparse
 import os
 import torch
-import torchvision.models as models
 
 
 def _extract_img_features(cfg):

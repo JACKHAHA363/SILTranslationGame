@@ -7,10 +7,10 @@ import torch.nn as nn
 
 from utils.data import TextVocab
 from utils.misc import write_tb, plot_grad, cuda
-from metrics import Metrics, Best
+from utils.metrics import Metrics, Best
 
 import torchvision
-from img_utils import ImageFolderWithPaths, preprocess_rc
+from utils.img import ImageFolderWithPaths, preprocess_rc
 
 def retrieval(idx, query, dim):
     # idx : (K, nb_qury) or (nb_query, K)

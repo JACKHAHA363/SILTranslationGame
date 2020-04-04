@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from utils.misc import write_tb
-from metrics import Metrics, Best
+from utils.metrics import Metrics, Best
 from utils.bleu import computeBLEU, print_bleu
 from pathlib import Path
 from os.path import join

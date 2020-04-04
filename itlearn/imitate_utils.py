@@ -3,7 +3,7 @@ from torch.nn import functional as F
 import random
 
 from agents_utils import eval_fr_en_stats
-from metrics import Metrics
+from utils.metrics import Metrics
 from utils.bleu import computeBLEU
 from utils.misc import cuda
 
