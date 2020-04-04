@@ -2,7 +2,7 @@
 Evaluate the ease of teaching accross the training trajectory
 """
 import argparse
-from agent import RNNAttn
+from models.agent import RNNAttn
 import torch
 import os
 

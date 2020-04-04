@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.misc import cuda
-from modules import ArgsModule
+from itlearn.utils.misc import cuda
+from itlearn.models.modules import ArgsModule
 
 def take_last(output, x_len, n_dir, D_hid):
     batch_size = x_len.size()[0]
