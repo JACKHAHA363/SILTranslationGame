@@ -4,8 +4,8 @@ import random
 
 from agents_utils import eval_fr_en_stats
 from metrics import Metrics
-from misc.bleu import computeBLEU
-from utils import cuda
+from utils.bleu import computeBLEU
+from utils.misc import cuda
 
 __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']

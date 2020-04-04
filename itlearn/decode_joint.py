@@ -1,16 +1,7 @@
-import math
-
-import numpy as np
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import token_analysis, get_counts, write_tb, plot_grad, cuda
-from metrics import Metrics, Best
-from misc.bleu import computeBLEU, compute_bp, print_bleu
+from utils.bleu import computeBLEU
 
-from pathlib import Path
 
 def valid_model(args, model, dev_it):
     with torch.no_grad():

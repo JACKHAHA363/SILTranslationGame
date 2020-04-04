@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 
-from misc.bleu import sentence_bleu
+from utils.bleu import sentence_bleu
 
 def get_sentence_bleus(hyp_path, ref_path, gram, dobp):
     refs = ref_path.read_text().split('\n')

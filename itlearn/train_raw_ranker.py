@@ -1,18 +1,16 @@
 import random
-import math
 import os
 
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset, TextVocab
-from utils import token_analysis, get_counts, write_tb, plot_grad, cuda, normf
+from data import TextVocab
+from utils.misc import write_tb, plot_grad, cuda
 from metrics import Metrics, Best
 
 import torchvision
-from img_utils import preprocess_1c, ImageFolderWithPaths, preprocess_rc
+from img_utils import ImageFolderWithPaths, preprocess_rc
 
 def retrieval(idx, query, dim):
     # idx : (K, nb_qury) or (nb_query, K)

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils import write_tb, plot_grad
+from utils.misc import write_tb, plot_grad
 from metrics import Metrics, Best
 from run_utils import get_model
 import matplotlib.pyplot as plt

@@ -11,7 +11,7 @@ from agent import ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params
 from metrics import Metrics
 from agents_utils import eval_fr_en_stats
-from misc.bleu import computeBLEU
+from utils.bleu import computeBLEU
 import random
 
 

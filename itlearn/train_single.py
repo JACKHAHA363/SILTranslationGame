@@ -1,14 +1,10 @@
-import math
-
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import write_tb, xlen_to_inv_mask
+from utils.misc import write_tb
 from metrics import Metrics, Best
-from misc.bleu import computeBLEU, compute_bp, print_bleu
+from utils.bleu import computeBLEU, print_bleu
 from pathlib import Path
 from os.path import join
 

@@ -1,7 +1,6 @@
-import torch
 from torch.nn import functional as F
 from metrics import Metrics
-from misc.bleu import computeBLEU, print_bleu
+from utils.bleu import computeBLEU, print_bleu
 import sys
 import torch
 import os

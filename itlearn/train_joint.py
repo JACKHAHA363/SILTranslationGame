@@ -2,7 +2,7 @@ from torch import nn as nn
 import torch
 from pathlib import Path
 from metrics import Metrics, Best
-from utils import write_tb, plot_grad
+from utils.misc import write_tb, plot_grad
 from agents_utils import eval_model, valid_model
 import math
 import numpy as np

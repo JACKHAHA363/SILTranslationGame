@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 
-from utils import cuda, xlen_to_inv_mask
+from utils.misc import cuda
 from modules import ArgsModule
 
 def take_last(output, x_len, n_dir, D_hid):

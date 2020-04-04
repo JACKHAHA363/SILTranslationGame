@@ -5,7 +5,7 @@ import numpy as np
 
 from agent import RNNAttn
 from agents_utils import eval_fr_en_stats
-from utils import cuda, xlen_to_inv_mask
+from utils.misc import cuda, xlen_to_inv_mask
 from modules import ArgsModule
 
 

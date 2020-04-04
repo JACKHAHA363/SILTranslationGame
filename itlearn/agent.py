@@ -1,17 +1,13 @@
-import operator
 import torch
-import math
-import sys
-import os
 import torch.nn as nn
-from torch.nn import Linear, GRU, Embedding, Module
+from torch.nn import Linear
 import torch.nn.functional as F
 
 from enc_rnn import RNNEnc
 from dec_rnn import RNNDec
 from dec_attn import RNNDecAttn
 
-from utils import cuda, normf
+from utils.misc import cuda, normf
 from modules import ArgsModule
 
 SMALL = 1e-10

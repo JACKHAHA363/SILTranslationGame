@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from run_utils import get_model, get_data, get_ckpt_paths
-from utils import set_seed, get_logger
+from utils.misc import set_seed, get_logger
 from agent import ImageCaptioning, RNNLM, ImageGrounding
 from hyperparams import Params, get_hp_str
 from data import get_s2p_dataset

@@ -1,16 +1,11 @@
 import random
-import math
 
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import token_analysis, get_counts, write_tb, plot_grad, cuda, normf
+from utils.misc import write_tb, plot_grad, cuda, normf
 from metrics import Metrics, Best
 
-from pathlib import Path
 
 def retrieval(idx, query, dim):
     # idx : (K, 5000) or (5000, K)

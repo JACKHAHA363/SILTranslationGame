@@ -4,17 +4,14 @@ Decode English from trained models
 import sys
 import torch
 from tqdm import tqdm
-from time import strftime, localtime
 import os
-from pathlib import Path
 
 from torchtext import data
 from run_utils import get_model
 from data import NormalField, NormalTranslationDataset, BOS, EOS, PAD, UNK, batch_size_fn, TextVocab, \
     TripleTranslationDataset
-from utils import set_seed, get_logger
-from hyperparams import Params, get_hp_str
-from misc.bleu import computeBLEU, print_bleu
+from hyperparams import Params
+from utils.bleu import computeBLEU, print_bleu
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 

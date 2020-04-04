@@ -2,16 +2,15 @@ import io
 import six
 import torch
 import _pickle as pickle
-import revtok
 import os
-from os.path import abspath, dirname, join
+from os.path import join
 
-from torchtext import data, datasets, vocab
+from torchtext import data, vocab
 from torchtext.data import Dataset
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict
 from contextlib import ExitStack
 
-from utils import which_machine, cuda
+from utils.misc import cuda
 
 # Constant
 PAD = '<pad>'
