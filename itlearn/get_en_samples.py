@@ -7,7 +7,7 @@ from tqdm import tqdm
 import os
 from run_utils import get_model
 from data import get_iwslt_iters, get_multi30k_iters
-from hyperparams import Params
+from utils.hyperparams import Params
 from utils.bleu import computeBLEU, print_bleu
 
 home_path = os.path.dirname(os.path.abspath(__file__))

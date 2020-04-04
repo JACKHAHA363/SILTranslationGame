@@ -8,7 +8,7 @@ import os
 import torch.nn.functional as F
 from run_utils import get_model, get_data, get_ckpt_paths
 from models.agent import ImageCaptioning, RNNLM, ImageGrounding
-from hyperparams import Params
+from utils.hyperparams import Params
 from utils.metrics import Metrics
 from agents_utils import eval_fr_en_stats
 from utils.bleu import computeBLEU
