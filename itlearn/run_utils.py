@@ -1,5 +1,5 @@
 from models.agent import RNNAttn, RNNLM, ImageCaptioning, ImageGrounding
-from agents import AgentsA2C, AgentsGumbel
+from finetune.agents import AgentsA2C, AgentsGumbel
 from data import build_dataset
 import os
 

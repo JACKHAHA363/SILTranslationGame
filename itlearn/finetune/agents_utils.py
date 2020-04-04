@@ -2,9 +2,9 @@ from pathlib import Path
 
 import torch
 
-from utils.metrics import Metrics
-from utils.bleu import computeBLEU, print_bleu
-from utils.misc import cuda, sum_reward
+from itlearn.utils.metrics import Metrics
+from itlearn.utils.bleu import computeBLEU, print_bleu
+from itlearn.utils.misc import cuda, sum_reward
 
 
 def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,

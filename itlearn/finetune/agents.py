@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from models.agent import RNNAttn
-from agents_utils import eval_fr_en_stats
-from utils.misc import cuda, xlen_to_inv_mask
-from models.modules import ArgsModule
+from itlearn.models.agent import RNNAttn
+from itlearn.finetune.agents_utils import eval_fr_en_stats
+from itlearn.utils.misc import cuda, xlen_to_inv_mask
+from itlearn.models.modules import ArgsModule
 
 
 class BaseAgents(ArgsModule):

@@ -2,10 +2,10 @@ import torch
 from torch.nn import functional as F
 import random
 
-from agents_utils import eval_fr_en_stats
-from utils.metrics import Metrics
-from utils.bleu import computeBLEU
-from utils.misc import cuda
+from itlearn.finetune.agents_utils import eval_fr_en_stats
+from itlearn.utils.metrics import Metrics
+from itlearn.utils.bleu import computeBLEU
+from itlearn.utils.misc import cuda
 
 __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']

@@ -1,11 +1,12 @@
 from torch import nn as nn
 import torch
 from pathlib import Path
-from utils.metrics import Metrics, Best
-from utils.misc import write_tb, plot_grad
-from agents_utils import eval_model, valid_model
 import math
 import numpy as np
+
+from itlearn.utils.metrics import Metrics, Best
+from itlearn.utils.misc import write_tb, plot_grad
+from itlearn.finetune.agents_utils import eval_model, valid_model
 
 
 def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names, monitor_names):

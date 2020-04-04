@@ -173,23 +173,23 @@ elif args.setup == "lm":
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "joint":
-    from agents_utils import train_a2c_model
-    from train_joint import joint_loop
+    from finetune.agents_utils import train_a2c_model
+    from finetune.train_joint import joint_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'itlearn':
-    from agents_utils import train_a2c_model
-    from train_iterlearn import itlearn_loop
+    from finetune.agents_utils import train_a2c_model
+    from finetune.train_iterlearn import itlearn_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 
 elif args.setup == 'gumbel':
-    from agents_utils import train_gumbel_model
-    from train_joint import joint_loop
+    from finetune.agents_utils import train_gumbel_model
+    from finetune.train_joint import joint_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'gumbel_itlearn':
-    from agents_utils import train_gumbel_model
-    from train_iterlearn import itlearn_loop
+    from finetune.agents_utils import train_gumbel_model
+    from finetune.train_iterlearn import itlearn_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 else:
     raise ValueError
