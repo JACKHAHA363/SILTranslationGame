@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from utils.misc import write_tb, plot_grad
-from utils.metrics import Metrics, Best
+from itlearn.utils.misc import write_tb, plot_grad
+from itlearn.utils.metrics import Metrics, Best
 
 
 def repackage_hidden(h):

@@ -157,19 +157,19 @@ if torch.cuda.device_count() > 0 and args.gpu > -1:
 
 # Main
 if args.setup == "single":
-    from train_single import train_model
+    from pretrain.train_single import train_model
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "ranker":
     if args.img_pred_loss == "nll":
-        from train_captioner import train_model
+        from pretrain.train_captioner import train_model
         train_model(args, model, (train_it, dev_it), extra_input)
     elif args.img_pred_loss in ["vse", "mse"]:
-        from train_raw_ranker import train_model
+        from pretrain.train_raw_ranker import train_model
         train_model(args, model)
 
 elif args.setup == "lm":
-    from train_lm import train_model
+    from pretrain.train_lm import train_model
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "joint":

@@ -3,8 +3,8 @@ import random
 import torch
 import torch.nn as nn
 
-from utils.misc import write_tb, plot_grad, cuda, normf
-from utils.metrics import Metrics, Best
+from itlearn.utils.misc import write_tb, plot_grad, cuda, normf
+from itlearn.utils.metrics import Metrics, Best
 
 
 def retrieval(idx, query, dim):

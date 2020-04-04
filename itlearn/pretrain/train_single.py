@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
-from utils.misc import write_tb
-from utils.metrics import Metrics, Best
-from utils.bleu import computeBLEU, print_bleu
 from pathlib import Path
 from os.path import join
+
+from itlearn.utils.misc import write_tb
+from itlearn.utils.metrics import Metrics, Best
+from itlearn.utils.bleu import computeBLEU, print_bleu
 
 
 def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, test_set="valid"):

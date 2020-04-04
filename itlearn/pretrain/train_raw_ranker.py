@@ -4,13 +4,13 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
-
-from utils.data import TextVocab
-from utils.misc import write_tb, plot_grad, cuda
-from utils.metrics import Metrics, Best
-
 import torchvision
-from utils.img import ImageFolderWithPaths, preprocess_rc
+
+from itlearn.utils.data import TextVocab
+from itlearn.utils.misc import write_tb, plot_grad, cuda
+from itlearn.utils.metrics import Metrics, Best
+from itlearn.utils.img import ImageFolderWithPaths, preprocess_rc
+
 
 def retrieval(idx, query, dim):
     # idx : (K, nb_qury) or (nb_query, K)
