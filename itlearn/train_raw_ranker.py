@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from data import TextVocab
+from utils.data import TextVocab
 from utils.misc import write_tb, plot_grad, cuda
 from metrics import Metrics, Best
 

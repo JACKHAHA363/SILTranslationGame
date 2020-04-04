@@ -5,11 +5,8 @@ import sys
 import torch
 from tqdm import tqdm
 import os
-
-from torchtext import data
 from run_utils import get_model
-from data import NormalField, NormalTranslationDataset, BOS, EOS, PAD, UNK, batch_size_fn, TextVocab, \
-    TripleTranslationDataset
+from data import get_iwslt_iters, get_multi30k_iters
 from hyperparams import Params
 from utils.bleu import computeBLEU, print_bleu
 
@@ -39,63 +36,18 @@ folders = ["event", "model", "log", "param"]
 if args.setup in ['single'] + JOINT_SETUPS:
     folders.append('decoding')
 
-# Data
-def get_IWSLT(gpu, data_dir):
-    device = "cuda:{}".format(gpu) if gpu > -1 and torch.cuda.device_count() > 0 else "cpu"
-    bpe_path = os.path.join(data_dir, 'bpe')
-    en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
-
-    # IWSLT
-    src_field = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
-                            include_lengths=True, batch_first=True)
-    trg_field = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
-                            include_lengths=True, batch_first=True)
-    vocabs = [fr_vocab, en_vocab]
-    for (field, vocab) in zip([src_field, trg_field], vocabs):
-        field.vocab = TextVocab(counter=torch.load(os.path.join(bpe_path, vocab)))
-
-    src = '.fr'
-    trg = '.en'
-    pair = 'fr-en'
-    dev_path = os.path.join(bpe_path, 'iwslt', pair, 'IWSLT16.TED.tst2013.' + pair)
-    dev_data = NormalTranslationDataset(path=dev_path,
-                                        exts=(src, trg), fields=(src_field, trg_field),
-                                        load_dataset=False, save_dataset=False)
-    iwslt_it = data.BucketIterator(dev_data, 256, device=device,
-                                   batch_size_fn=batch_size_fn, train=False,
-                                   repeat=False, shuffle=False,
-                                   sort=False, sort_within_batch=True)
-    return iwslt_it
-
-def get_multi30k(args, gpu, data_dir):
-    device = "cuda:{}".format(gpu) if gpu > -1 and torch.cuda.device_count() > 0 else "cpu"
-    FR = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
-                     include_lengths=True, batch_first=True)
-    EN = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
-                     include_lengths=True, batch_first=True)
-    DE = NormalField(init_token=BOS, eos_token=EOS, pad_token=PAD, unk_token=UNK,
-                     include_lengths=True, batch_first=True)
-    bpe_path = os.path.join(data_dir, 'bpe')
-    en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
-    vocabs = [fr_vocab, en_vocab, de_vocab]
-    fields = [FR, EN, DE]
-    exts = ['.fr', '.en', '.de']
-
-    for (field, vocab) in zip(fields, vocabs):
-        field.vocab = TextVocab(counter=torch.load(os.path.join(bpe_path, vocab)))
-    dev_data = TripleTranslationDataset(path=os.path.join(bpe_path, 'multi30k', 'val'),
-                                        exts=exts, fields=fields,
-                                        load_dataset=False, save_dataset=False)
-
-    multi30k_it = data.BucketIterator(dev_data, 1024, device=device,
-                                 batch_size_fn=batch_size_fn,
-                                 train=False, repeat=False, shuffle=False,
-                                 sort=False, sort_within_batch=True)
-    args.__dict__.update({'FR': FR, "DE": DE, "EN": EN})
-    return multi30k_it
-
-iwslt_it = get_IWSLT(args.gpu, args.data_dir)
-multi30k_it = get_multi30k(args, args.gpu, args.data_dir)
+# Get data
+device = "cuda:{}".format(args.gpu) if args.gpu > -1 and torch.cuda.device_count() > 0 else "cpu"
+bpe_path = os.path.join(args.data_dir, 'bpe')
+en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
+_, _, _, iwslt_it = get_iwslt_iters(pair='fr_en', bpe_path=bpe_path,
+                                    de_vocab=de_vocab, device=device,
+                                    en_vocab=en_vocab, fr_vocab=fr_vocab,
+                                    train_repeat=False,
+                                    batch_size=args.batch_size)
+_, _, _, _, multi30k_it = get_multi30k_iters(bpe_path=bpe_path, de_vocab=de_vocab, device=device,
+                                             en_vocab=en_vocab, fr_vocab=fr_vocab, train_repeat=False,
+                                             batch_size=args.batch_size)
 args.__dict__.update({'pad_token': 0,
                       'unk_token': 1,
                       'init_token': 2,
