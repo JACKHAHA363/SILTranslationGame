@@ -1,16 +1,12 @@
 import random
-import math
 
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import token_analysis, get_counts, write_tb, plot_grad, cuda
-from metrics import Metrics, Best
+from itlearn.utils.misc import write_tb, plot_grad, cuda
+from itlearn.utils.metrics import Metrics, Best
 
-from pathlib import Path
 
 def valid_model(args, model, dev_it, dev_metrics, iters, loss_names, monitor_names, extra_input):
     with torch.no_grad():

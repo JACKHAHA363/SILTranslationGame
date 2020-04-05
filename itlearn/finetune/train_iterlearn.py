@@ -3,16 +3,16 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-
-from utils import write_tb, plot_grad
-from metrics import Metrics, Best
-from run_utils import get_model
 import matplotlib.pyplot as plt
-from agents_utils import eval_model, valid_model
 import os
 from pandas import DataFrame
 from pathlib import Path
-from imitate_utils import imitate_fr_en, imitate_en_de, get_fr_en_imitate_stats, \
+
+from itlearn.utils.misc import write_tb, plot_grad
+from itlearn.utils.metrics import Metrics, Best
+from itlearn.finetune.agents_utils import eval_model, valid_model
+from itlearn.finetune.agents import AgentsA2C, AgentsGumbel
+from itlearn.finetune.imitate_utils import imitate_fr_en, imitate_en_de, get_fr_en_imitate_stats, \
     get_en_de_imitate_stats, finetune_en_de
 
 
@@ -89,7 +89,10 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                 gpu=args.gpu, debug=args.debug)
 
     # Prepare_init_student
-    student = get_model(args)
+    if 'gumbel' in args.setup:
+        student = AgentsGumbel(args)
+    else:
+        student = AgentsA2C(args)
     student.load_state_dict(model.state_dict())
     if torch.cuda.device_count() > 0 and args.gpu > -1:
         student.cuda(args.gpu)

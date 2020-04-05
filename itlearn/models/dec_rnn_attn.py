@@ -4,12 +4,12 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import Linear, GRU, Embedding, Module
+from torch.nn import Linear, Module
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from utils import cuda, xlen_to_inv_mask, gumbel_softmax_hard
-from modules import ArgsModule
+from itlearn.utils.misc import cuda, xlen_to_inv_mask, gumbel_softmax_hard
+from itlearn.models.modules import ArgsModule
 
 class AttentionLayer(Module):
     def __init__(self, D_key, D_query):

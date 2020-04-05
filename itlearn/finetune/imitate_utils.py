@@ -2,10 +2,10 @@ import torch
 from torch.nn import functional as F
 import random
 
-from agents_utils import eval_fr_en_stats
-from metrics import Metrics
-from misc.bleu import computeBLEU
-from utils import cuda
+from itlearn.finetune.agents_utils import eval_fr_en_stats
+from itlearn.utils.metrics import Metrics
+from itlearn.utils.bleu import computeBLEU
+from itlearn.utils.misc import cuda
 
 __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
@@ -53,7 +53,7 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
-    s2p_fr_en_it = iter(extra_input['s2p_its']['fr-en'])
+    s2p_fr_en_it = iter(extra_input['s2p_its']['fr_en'])
     train_it = iter(train_it)
     while True:
         if iters >= args.fr_en_k2:

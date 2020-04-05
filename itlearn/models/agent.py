@@ -1,18 +1,13 @@
-import operator
 import torch
-import math
-import sys
-import os
 import torch.nn as nn
-from torch.nn import Linear, GRU, Embedding, Module
+from torch.nn import Linear
 import torch.nn.functional as F
 
-from enc_rnn import RNNEnc
-from dec_rnn import RNNDec
-from dec_attn import RNNDecAttn
-
-from utils import cuda, normf
-from modules import ArgsModule
+from itlearn.models.enc_rnn import RNNEnc
+from itlearn.models.dec_rnn import RNNDec
+from itlearn.models.dec_attn import RNNDecAttn
+from itlearn.models.modules import ArgsModule
+from itlearn.utils.misc import cuda, normf
 
 SMALL = 1e-10
 

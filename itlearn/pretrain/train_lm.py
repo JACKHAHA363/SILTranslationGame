@@ -1,16 +1,10 @@
-import random
-import math
-
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import token_analysis, get_counts, write_tb, plot_grad, cuda
-from metrics import Metrics, Best
+from itlearn.utils.misc import write_tb, plot_grad
+from itlearn.utils.metrics import Metrics, Best
 
-from pathlib import Path
 
 def repackage_hidden(h):
     if isinstance(h, torch.Tensor):

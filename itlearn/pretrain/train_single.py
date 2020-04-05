@@ -1,16 +1,12 @@
-import math
-
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
-from data import NormalField, NormalTranslationDataset, TripleTranslationDataset
-from utils import write_tb, xlen_to_inv_mask
-from metrics import Metrics, Best
-from misc.bleu import computeBLEU, compute_bp, print_bleu
 from pathlib import Path
 from os.path import join
+
+from itlearn.utils.misc import write_tb
+from itlearn.utils.metrics import Metrics, Best
+from itlearn.utils.bleu import computeBLEU, print_bleu
 
 
 def valid_model(args, model, dev_it, dev_metrics, decode_method, beam_width=5, test_set="valid"):

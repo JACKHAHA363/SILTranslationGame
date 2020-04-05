@@ -1,14 +1,14 @@
 import operator
 import math
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from utils import cuda
-from modules import ArgsModule
+from itlearn.utils.misc import cuda
+from itlearn.models.modules import ArgsModule
+
 
 class RNNDec(ArgsModule):
     def __init__(self, args):

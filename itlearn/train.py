@@ -8,9 +8,9 @@ import os
 from pathlib import Path
 
 from run_utils import get_model, get_data, get_ckpt_paths
-from utils import set_seed, get_logger
-from agent import ImageCaptioning, RNNLM, ImageGrounding
-from hyperparams import Params, get_hp_str
+from utils.misc import set_seed, get_logger
+from models.agent import ImageCaptioning, RNNLM, ImageGrounding
+from utils.hyperparams import Params, get_hp_str
 from data import get_s2p_dataset
 
 home_path = os.path.dirname(os.path.abspath(__file__))
@@ -89,7 +89,6 @@ if args.setup in JOINT_SETUPS and args.use_en_lm:
         en_lm.cuda(args.gpu)
     extra_input["en_lm"] = en_lm
 
-#if False and ( args.setup == "ranker" or (args.setup == "joint" and args.use_ranker) ):
 if (args.setup in JOINT_SETUPS) and args.use_ranker:
     ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
     args.logger.info("Loading ranker from: " + ranker_param)
@@ -111,13 +110,6 @@ if (args.setup in JOINT_SETUPS) and args.use_ranker:
     img["multi30k"] = [torch.tensor(train_feats), torch.tensor(val_feats)]
     args.logger.info("Loading Flickr30k image features: train {} valid {}".format(
         img['multi30k'][0].shape, img['multi30k'][1].shape))
-    #if args.setup == "ranker" or "coco" in args.dataset:
-    #    raise NotImplemented
-    #    size = "resnet152/" if args.D_img == 2048 else "resnet34/"
-    #    img_path = "/private/home/jasonleeinf/corpora/coco/feats/{}".format(size)
-    #    img["coco"] = [torch.load(img_path+x) for x in ["train_feats.pt", "valid_feats.pt"]]
-    #    args.logger.info("Loading {} image features: train {} valid {}".format( \
-    #                      args.dataset.upper(), img['coco'][0].shape, img['coco'][1].shape ))
     extra_input["img"] = img
 
 # Get iwslt its for s2p
@@ -165,39 +157,39 @@ if torch.cuda.device_count() > 0 and args.gpu > -1:
 
 # Main
 if args.setup == "single":
-    from train_single import train_model
+    from pretrain.train_single import train_model
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "ranker":
     if args.img_pred_loss == "nll":
-        from train_captioner import train_model
+        from pretrain.train_captioner import train_model
         train_model(args, model, (train_it, dev_it), extra_input)
     elif args.img_pred_loss in ["vse", "mse"]:
-        from train_raw_ranker import train_model
+        from pretrain.train_raw_ranker import train_model
         train_model(args, model)
 
 elif args.setup == "lm":
-    from train_lm import train_model
+    from pretrain.train_lm import train_model
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "joint":
-    from agents_utils import train_a2c_model
-    from train_joint import joint_loop
+    from finetune.agents_utils import train_a2c_model
+    from finetune.train_joint import joint_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'itlearn':
-    from agents_utils import train_a2c_model
-    from train_iterlearn import itlearn_loop
+    from finetune.agents_utils import train_a2c_model
+    from finetune.train_iterlearn import itlearn_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 
 elif args.setup == 'gumbel':
-    from agents_utils import train_gumbel_model
-    from train_joint import joint_loop
+    from finetune.agents_utils import train_gumbel_model
+    from finetune.train_joint import joint_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'gumbel_itlearn':
-    from agents_utils import train_gumbel_model
-    from train_iterlearn import itlearn_loop
+    from finetune.agents_utils import train_gumbel_model
+    from finetune.train_iterlearn import itlearn_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 else:
     raise ValueError
