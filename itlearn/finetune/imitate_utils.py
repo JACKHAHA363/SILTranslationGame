@@ -53,7 +53,7 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
-    s2p_fr_en_it = iter(extra_input['s2p_its']['fr-en'])
+    s2p_fr_en_it = iter(extra_input['s2p_its']['fr_en'])
     train_it = iter(train_it)
     while True:
         if iters >= args.fr_en_k2:
