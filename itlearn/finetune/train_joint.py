@@ -35,7 +35,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
     fr_en_it, en_de_it = None, None
     if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
         args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
-        fr_en_it, en_de_it = extra_input['s2p_its']['fr-en'], extra_input['s2p_its']['en-de']
+        fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'], extra_input['s2p_its']['en_de']
         fr_en_it = iter(fr_en_it)
         en_de_it = iter(en_de_it)
 

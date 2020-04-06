@@ -215,6 +215,11 @@ def main():
                             max_training_steps=200 if args.debug else 20000)
         statss.append(stats)
 
+    # Save to pickle
+    import pickle
+    with open(os.path.join(args.outdir, 'data.pkl'), 'wb') as f:
+        pickle.dump({'steps': sorted(ckpt_with_steps.keys()), 'statss': statss}, f)
+
     import matplotlib.pyplot as plt
     print('Start plotting...')
     NB_COL = 2
