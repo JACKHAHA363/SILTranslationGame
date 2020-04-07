@@ -110,7 +110,7 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
             print('stopping training after {} training steps'.format(max_training_steps))
             break
 
-        if iters % 2000 == 0:
+        if iters % 1000 == 0:
             dev_metrics.reset()
             dev_bleu = valid_model(model, dev_it, dev_metrics)
             write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
@@ -139,8 +139,13 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     # Final evaluation
     dev_metrics.reset()
     dev_bleu = valid_model(model, dev_it, dev_metrics)
-    stats = {'dev/{}'.format(key): val for key, val in dev_metrics.metrics.items()}
-    stats.update({'train/{}'.format(key): val for key, val in train_metrics.metrics.items()})
+    write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
+    write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'],
+             dev_bleu, iters, prefix="bleu/")
+
+    # Return stats
+    stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
+    stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
     stats['dev/bleu'] = dev_bleu[0]
     return stats
 
@@ -151,14 +156,14 @@ def main():
     # Read a list of checkpoint
     ckpt_dir = os.path.join(args.exp_dir, 'model', args.experiment)
     ckpts = [m for m in os.listdir(ckpt_dir) if 'iter=' in m and '.states' not in m]
-    if args.debug:
-        print('Debug mode on')
-        ckpts = ckpts[:5]
-    else:
-        print('Debug mode off')
     print('Found {} checkpints'.format(len(ckpts)))
     ckpt_with_steps = {int(ckpt.split('.pt')[0].split('_iter=')[-1]): ckpt
                        for ckpt in ckpts}
+    if args.debug:
+        print('Debug mode on')
+        ckpts_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
+    else:
+        print('Debug mode off')
 
     # Data
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
