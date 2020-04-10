@@ -17,6 +17,8 @@ from data import get_multi30k_iters, batch_size_fn
 from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
 
+NB_RUNS = 5
+
 
 def get_args():
     # Parse from cmd to get JSON
@@ -142,6 +144,7 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
     write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'],
              dev_bleu, iters, prefix="bleu/")
+    writer.flush()
 
     # Return stats
     stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
@@ -161,7 +164,7 @@ def main():
                        for ckpt in ckpts}
     if args.debug:
         print('Debug mode on')
-        ckpts_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
+        ckpt_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
     else:
         print('Debug mode off')
 
@@ -210,15 +213,18 @@ def main():
                                       device=device, batch_size=512)
         print('Build Train dataset done')
 
-        # Start learning
-        student = AgentsGumbel(args)
-        student.cuda(args.gpu)
-        print('Initial model done')
+        runs_stats = []
+        for run in range(NB_RUNS):
+            # Start learning
+            student = AgentsGumbel(args)
+            student.cuda(args.gpu)
+            print('Initial model done')
 
-        stats = train_model(student.fr_en, train_it, dev_it,
-                            outdir=os.path.join(args.outdir, 'iters_{}'.format(iter_step)),
-                            max_training_steps=200 if args.debug else 20000)
-        statss.append(stats)
+            stats = train_model(student.fr_en, train_it, dev_it,
+                                outdir=os.path.join(args.outdir, 'iters_{}_run_{}'.format(iter_step, run)),
+                                max_training_steps=100 if args.debug else 20000)
+            runs_stats.append(stats)
+        statss.append(runs_stats)
 
     # Save to pickle
     import pickle
@@ -226,13 +232,19 @@ def main():
         pickle.dump({'steps': sorted(ckpt_with_steps.keys()), 'statss': statss}, f)
 
     import matplotlib.pyplot as plt
+    import numpy as np
     print('Start plotting...')
     NB_COL = 2
     NB_ROW = int(len(statss[0])/2) + 1
     fig, axs = plt.subplots(NB_ROW, 2, figsize=(8*NB_ROW, 10*NB_COL))
-    for key, ax in zip(statss[0], axs.reshape(-1)):
+    for key, ax in zip(statss[0][0], axs.reshape(-1)):
         steps = sorted(ckpt_with_steps.keys())
-        ax.plot(steps, [stats[key] for stats in statss])
+        values = [[stats[key] for stats in run_stats] for run_stats in statss]
+        means = np.mean(values, -1)
+        stds = np.std(values, -1)
+        ax.plot(steps, means)
+        ax.fill_between(steps, means - stds, means + stds,
+                        alpha=0.2)
         ax.set_xlabel('steps', fontsize=15)
         ax.set_title(key)
 
