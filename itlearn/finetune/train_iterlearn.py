@@ -102,7 +102,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     s2p_fr_en_it, s2p_en_de_it = None, None
     if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
         args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
-        s2p_fr_en_it, s2p_en_de_it = extra_input['s2p_its']['fr-en'], extra_input['s2p_its']['en-de']
+        s2p_fr_en_it, s2p_en_de_it = extra_input['s2p_its']['fr_en'], extra_input['s2p_its']['en_de']
         s2p_fr_en_it = iter(s2p_fr_en_it)
         s2p_en_de_it = iter(s2p_en_de_it)
 
