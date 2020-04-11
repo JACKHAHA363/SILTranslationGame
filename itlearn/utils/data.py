@@ -39,7 +39,7 @@ class TextVocab(vocab.Vocab):
 
 class NormalField(data.Field):
 
-    def reverse(self, batch, unbpe=True):
+    def reverse(self, batch, unbpe=True, remove_dots=False):
         if isinstance(batch, torch.Tensor):
             if not self.batch_first:
                 batch = batch.t()
@@ -58,8 +58,12 @@ class NormalField(data.Field):
 
         batch = [trim(ex, self.eos_token) for ex in batch] # trim past frst eos
 
+        specials = [self.init_token, self.pad_token]
+        if remove_dots:
+            specials.append('.')
+
         def filter_special(tok):
-            return tok not in (self.init_token, self.pad_token)
+            return tok not in specials
 
         if unbpe:
             batch = [" ".join(filter(filter_special, ex)).replace("@@ ", "") for ex in batch]

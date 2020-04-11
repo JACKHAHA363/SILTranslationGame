@@ -17,7 +17,7 @@ from data import get_multi30k_iters, batch_size_fn
 from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
 
-NB_RUNS = 5
+NB_RUNS = 1
 
 
 def get_args():
@@ -53,7 +53,7 @@ def get_args():
     return args
 
 
-def build_fr_en_it(multi30_it, teacher_model, train_repeat, batch_size, device):
+def build_fr_en_it(multi30_it, teacher_model, train_repeat, batch_size, device, remove_dots=False):
     """ Build an iterator from multi30k_data
     with a teacher model for france to english """
     teacher_model.eval()
@@ -61,7 +61,7 @@ def build_fr_en_it(multi30_it, teacher_model, train_repeat, batch_size, device):
     for batch in multi30_it:
         en_msg, _ = teacher_model.fr_en_speak(batch)
         fr_corpus.extend(teacher_model.FR.reverse(batch.fr[0], unbpe=True))
-        en_corpus.extend(teacher_model.EN.reverse(en_msg, unbpe=True))
+        en_corpus.extend(teacher_model.EN.reverse(en_msg, unbpe=True, remove_dots=remove_dots))
 
     fields = [('src', teacher_model.FR), ('trg', teacher_model.EN)]
     exs = [Example.fromlist(data=[fr_sent, en_sent], fields=fields)
@@ -201,16 +201,18 @@ def main():
         print('Load teacher from iter={}'.format(iter_step))
 
         # Generate New iterator
+        remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
         dev_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=False,
-                                device=device, batch_size=512)
+                                device=device, batch_size=512,
+                                remove_dots=remove_dots)
         print('Build Dev dataset done')
 
         if args.debug:
             train_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=True,
-                                      device=device, batch_size=512)
+                                      device=device, batch_size=512, remove_dots=remove_dots)
         else:
             train_it = build_fr_en_it(orig_train_it, teacher, train_repeat=True,
-                                      device=device, batch_size=512)
+                                      device=device, batch_size=512, remove_dots=remove_dots)
         print('Build Train dataset done')
 
         runs_stats = []
