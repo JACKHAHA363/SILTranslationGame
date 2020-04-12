@@ -53,17 +53,23 @@ def get_args():
     return args
 
 
-def build_fr_en_it(multi30_it, teacher_model, train_repeat, batch_size, device, remove_dots=False):
+def build_fr_en_it(multi30_it, train_repeat, batch_size, device, teacher_model=None, remove_dots=False):
     """ Build an iterator from multi30k_data
-    with a teacher model for france to english """
-    teacher_model.eval()
-    fr_corpus, en_corpus = [], []
-    for batch in multi30_it:
-        en_msg, _ = teacher_model.fr_en_speak(batch)
-        fr_corpus.extend(teacher_model.FR.reverse(batch.fr[0], unbpe=True))
-        en_corpus.extend(teacher_model.EN.reverse(en_msg, unbpe=True, remove_dots=remove_dots))
-
-    fields = [('src', teacher_model.FR), ('trg', teacher_model.EN)]
+    with a teacher model for france to english. Use original Eng if teacher is None """
+    fr, en = multi30_it.dataset.fields['fr'], multi30_it.dataset.fields['en']
+    if teacher_model is not None:
+        teacher_model.eval()
+        fr_corpus, en_corpus = [], []
+        for batch in multi30_it:
+            en_msg, _ = teacher_model.fr_en_speak(batch)
+            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+            en_corpus.extend(en.reverse(en_msg, unbpe=True, remove_dots=remove_dots))
+    else:
+        en_corpus, fr_corpus = [], []
+        for batch in multi30_it:
+            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+            en_corpus.extend(en.reverse(batch.en[0], unbpe=True, remove_dots=remove_dots))
+    fields = [('src', fr), ('trg', en)]
     exs = [Example.fromlist(data=[fr_sent, en_sent], fields=fields)
            for fr_sent, en_sent in zip(fr_corpus, en_corpus)]
     dataset = Dataset(examples=exs, fields=fields)
@@ -200,16 +206,16 @@ def main(args):
 
         # Generate New iterator
         remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
-        dev_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=False,
+        dev_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=False,
                                 device=device, batch_size=512,
                                 remove_dots=remove_dots)
         print('Build Dev dataset done')
 
         if args.debug:
-            train_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=True,
+            train_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=True,
                                       device=device, batch_size=512, remove_dots=remove_dots)
         else:
-            train_it = build_fr_en_it(orig_train_it, teacher, train_repeat=True,
+            train_it = build_fr_en_it(orig_train_it, teacher_model=teacher, train_repeat=True,
                                       device=device, batch_size=512, remove_dots=remove_dots)
         print('Build Train dataset done')
 
@@ -256,12 +262,12 @@ def human_eot(args):
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
     bpe_path = os.path.join(args.data_dir, 'bpe')
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
-    de, en, fr, train_it, dev_it = get_multi30k_iters(bpe_path=bpe_path, de_vocab=de_vocab, device=device,
-                                                      en_vocab=en_vocab, fr_vocab=fr_vocab,
-                                                      train_repeat=True,
-                                                      load_dataset=False,
-                                                      save_dataset=False,
-                                                      batch_size=512)
+    de, en, fr, orig_train_it, orig_dev_it = get_multi30k_iters(bpe_path=bpe_path, de_vocab=de_vocab, device=device,
+                                                                en_vocab=en_vocab, fr_vocab=fr_vocab,
+                                                                train_repeat=False,
+                                                                load_dataset=False,
+                                                                save_dataset=False,
+                                                                batch_size=512)
     args.__dict__.update({'FR': fr, "DE": de, "EN": en})
     args.__dict__.update({'pad_token': 0,
                           'unk_token': 1,
@@ -271,6 +277,20 @@ def human_eot(args):
     print('################################################')
 
     # Generate New iterator
+    remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
+    dev_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=False,
+                            device=device, batch_size=512,
+                            remove_dots=remove_dots)
+    print('Build Dev dataset done')
+
+    if args.debug:
+        train_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=True,
+                                  device=device, batch_size=512, remove_dots=remove_dots)
+    else:
+        train_it = build_fr_en_it(orig_train_it, teacher_model=None, train_repeat=True,
+                                  device=device, batch_size=512, remove_dots=remove_dots)
+    print('Build Train dataset done')
+
     runs_stats = []
     for run in range(NB_RUNS):
         # Start learning
@@ -291,7 +311,7 @@ def human_eot(args):
 
 if __name__ == '__main__':
     args = get_args()
-    if 'human' in args.__dict__:
+    if 'human' in args.__dict__ and args.human:
         print('Run Human EOT result')
         human_eot(args)
     else:
