@@ -17,7 +17,7 @@ from data import get_multi30k_iters, batch_size_fn
 from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
 
-NB_RUNS = 1
+NB_RUNS = 5
 
 
 def get_args():
