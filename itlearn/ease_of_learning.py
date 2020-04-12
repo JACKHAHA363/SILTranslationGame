@@ -153,9 +153,7 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     return stats
 
 
-def main():
-    args = get_args()
-
+def main(args):
     # Read a list of checkpoint
     ckpt_dir = os.path.join(args.exp_dir, 'model', args.experiment)
     ckpts = [m for m in os.listdir(ckpt_dir) if 'iter=' in m and '.states' not in m]
@@ -253,7 +251,51 @@ def main():
     fig.savefig(os.path.join(args.outdir, 'plots.png'))
 
 
+def human_eot(args):
+    # Data
+    device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
+    bpe_path = os.path.join(args.data_dir, 'bpe')
+    en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
+    de, en, fr, train_it, dev_it = get_multi30k_iters(bpe_path=bpe_path, de_vocab=de_vocab, device=device,
+                                                      en_vocab=en_vocab, fr_vocab=fr_vocab,
+                                                      train_repeat=True,
+                                                      load_dataset=False,
+                                                      save_dataset=False,
+                                                      batch_size=512)
+    args.__dict__.update({'FR': fr, "DE": de, "EN": en})
+    args.__dict__.update({'pad_token': 0,
+                          'unk_token': 1,
+                          'init_token': 2,
+                          'eos_token': 3})
+
+    print('################################################')
+
+    # Generate New iterator
+    runs_stats = []
+    for run in range(NB_RUNS):
+        # Start learning
+        student = AgentsGumbel(args)
+        student.cuda(args.gpu)
+        print('Initial model done')
+
+        stats = train_model(student.fr_en, train_it, dev_it,
+                            outdir=os.path.join(args.outdir, 'human_run_{}'.format(run)),
+                            max_training_steps=100 if args.debug else 20000)
+        runs_stats.append(stats)
+
+    # Save to pickle
+    import pickle
+    with open(os.path.join(args.outdir, 'data.pkl'), 'wb') as f:
+        pickle.dump({'human_stats': runs_stats}, f)
+
+
 if __name__ == '__main__':
-    main()
+    args = get_args()
+    if 'human' in args.__dict__:
+        print('Run Human EOT result')
+        human_eot(args)
+    else:
+        print('Run checkpoint EOT result')
+        main(args)
 
 
