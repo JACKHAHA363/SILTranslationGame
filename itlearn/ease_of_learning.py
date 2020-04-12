@@ -237,7 +237,7 @@ def main():
     import numpy as np
     print('Start plotting...')
     NB_COL = 2
-    NB_ROW = int(len(statss[0])/2) + 1
+    NB_ROW = int((len(statss[0]) + 1)/2)
     fig, axs = plt.subplots(NB_ROW, 2, figsize=(8*NB_ROW, 10*NB_COL))
     for key, ax in zip(statss[0][0], axs.reshape(-1)):
         steps = sorted(ckpt_with_steps.keys())

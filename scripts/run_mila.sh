@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --gres=gpu:1
 #SBATCH --mem=8G
-#SBATCH --exclude=eos21
+#SBATCH --exclude=eos21,bart14
 #SBATCH --mail-user=luyuchen.paul@gmail.com
 #SBATCH --mail-type=END,FAIL
 
