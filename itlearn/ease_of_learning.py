@@ -18,6 +18,7 @@ from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
 
 NB_RUNS = 5
+UNNORMALIZED = True
 
 
 def get_args():
@@ -153,8 +154,12 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     writer.flush()
 
     # Return stats
-    stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
-    stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
+    if UNNORMALIZED:
+        stats = {'dev/{}'.format(key): dev_metrics.metrics(key) for key in dev_metrics.metrics}
+        stats.update({'train/{}'.format(key): train_metrics.metrics(key) for key in train_metrics.metrics})
+    else:
+        stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
+        stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
     stats['dev/bleu'] = dev_bleu[0]
     return stats
 
