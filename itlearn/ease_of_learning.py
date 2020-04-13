@@ -16,21 +16,36 @@ from utils.hyperparams import Params
 from data import get_multi30k_iters, batch_size_fn
 from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
-
-NB_RUNS = 5
-UNNORMALIZED = True
+import argparse
 
 
 def get_args():
-    # Parse from cmd to get JSON
-    parsed_args, _ = Params.parse_cmd(sys.argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--outdir', required=True)
+    parser.add_argument('--exp_dir', required=True)
+    parser.add_argument('--data_dir', required=True)
+    parser.add_argument('--experiment', required=True)
+    parser.add_argument('--nb_runs', default=5, type=int)
+    parser.add_argument('--learning_steps', default=10000, type=int)
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--normalized', action='store_true')
+    parser.add_argument('--remove_dots', action='store_true')
+    parser.add_argument('--human', action='store_true')
+    parsed_args = parser.parse_args().__dict__
 
-    if 'config' in parsed_args:
-        print('Find json_config')
-        args = Params(parsed_args['config'])
-    else:
-        raise ValueError('You must pass in --config!')
+    print('###### CONFIG #########')
+    for key, val in parsed_args.items():
+        print('{}: {}'.format(key, val))
+    print('#######################')
 
+    # Try to load json
+    json_dir = os.path.join(parsed_args['exp_dir'], 'param', parsed_args['experiment'])
+    fnames = os.listdir(json_dir)
+    assert len(fnames) == 1, "More than one config file in the experiment!"
+    print('Find json_config', fnames[0])
+    params = Params(os.path.join(json_dir, fnames[0]))
+
+    # Create output dir
     if 'outdir' in parsed_args:
         print('storing result in {}'.format(parsed_args['outdir']))
         if os.path.exists(parsed_args['outdir']):
@@ -40,18 +55,8 @@ def get_args():
         raise ValueError('You must pass in --outdir')
 
     # Update some of them with command line
-    args.update(parsed_args)
-
-    if not hasattr(args, 'exp_dir'):
-        raise ValueError('You must provide exp_dir')
-    if not hasattr(args, 'data_dir'):
-        raise ValueError('You must provide data_dir')
-
-    assert args.experiment is not None and args.id_str is not None
-    print('Exp Dir:', args.exp_dir)
-    print('Experiment:', args.experiment)
-    print('Experiemnt ID', args.id_str)
-    return args
+    params.update(parsed_args)
+    return params
 
 
 def build_fr_en_it(multi30_it, train_repeat, batch_size, device, teacher_model=None, remove_dots=False):
@@ -154,21 +159,22 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     writer.flush()
 
     # Return stats
-    if UNNORMALIZED:
-        stats = {'dev/{}'.format(key): dev_metrics.metrics(key) for key in dev_metrics.metrics}
-        stats.update({'train/{}'.format(key): train_metrics.metrics(key) for key in train_metrics.metrics})
+    if not args.normalized:
+        # Unnormalized
+        stats = {'dev/{}'.format(key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
+        stats.update({'train/{}'.format(key): train_metrics.metrics[key] for key in train_metrics.metrics})
     else:
+        # Normalized
         stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
         stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
     stats['dev/bleu'] = dev_bleu[0]
     return stats
 
 
-def main(args):
+def main():
     # Read a list of checkpoint
     ckpt_dir = os.path.join(args.exp_dir, 'model', args.experiment)
     ckpts = [m for m in os.listdir(ckpt_dir) if 'iter=' in m and '.states' not in m]
-    print('Found {} checkpints'.format(len(ckpts)))
     ckpt_with_steps = {int(ckpt.split('.pt')[0].split('_iter=')[-1]): ckpt
                        for ckpt in ckpts}
     if args.debug:
@@ -176,6 +182,7 @@ def main(args):
         ckpt_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
     else:
         print('Debug mode off')
+    print('Found {} checkpints'.format(len(ckpt_with_steps)))
 
     # Data
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
@@ -225,7 +232,7 @@ def main(args):
         print('Build Train dataset done')
 
         runs_stats = []
-        for run in range(NB_RUNS):
+        for run in range(args.nb_runs):
             # Start learning
             student = AgentsGumbel(args)
             student.cuda(args.gpu)
@@ -233,7 +240,7 @@ def main(args):
 
             stats = train_model(student.fr_en, train_it, dev_it,
                                 outdir=os.path.join(args.outdir, 'iters_{}_run_{}'.format(iter_step, run)),
-                                max_training_steps=100 if args.debug else 20000)
+                                max_training_steps=100 if args.debug else args.learning_steps)
             runs_stats.append(stats)
         statss.append(runs_stats)
 
@@ -262,7 +269,7 @@ def main(args):
     fig.savefig(os.path.join(args.outdir, 'plots.png'))
 
 
-def human_eot(args):
+def human_eot():
     # Data
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
     bpe_path = os.path.join(args.data_dir, 'bpe')
@@ -282,22 +289,21 @@ def human_eot(args):
     print('################################################')
 
     # Generate New iterator
-    remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
     dev_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=False,
                             device=device, batch_size=512,
-                            remove_dots=remove_dots)
+                            remove_dots=args.remove_dots)
     print('Build Dev dataset done')
 
     if args.debug:
         train_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=True,
-                                  device=device, batch_size=512, remove_dots=remove_dots)
+                                  device=device, batch_size=512, remove_dots=args.remove_dots)
     else:
         train_it = build_fr_en_it(orig_train_it, teacher_model=None, train_repeat=True,
-                                  device=device, batch_size=512, remove_dots=remove_dots)
+                                  device=device, batch_size=512, remove_dots=args.remove_dots)
     print('Build Train dataset done')
 
     runs_stats = []
-    for run in range(NB_RUNS):
+    for run in range(args.nb_runs):
         # Start learning
         student = AgentsGumbel(args)
         student.cuda(args.gpu)
@@ -305,7 +311,7 @@ def human_eot(args):
 
         stats = train_model(student.fr_en, train_it, dev_it,
                             outdir=os.path.join(args.outdir, 'human_run_{}'.format(run)),
-                            max_training_steps=100 if args.debug else 20000)
+                            max_training_steps=100 if args.debug else args.nb_runs)
         runs_stats.append(stats)
 
     # Save to pickle
@@ -318,9 +324,9 @@ if __name__ == '__main__':
     args = get_args()
     if 'human' in args.__dict__ and args.human:
         print('Run Human EOT result')
-        human_eot(args)
+        human_eot()
     else:
         print('Run checkpoint EOT result')
-        main(args)
+        main()
 
 
