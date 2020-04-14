@@ -16,20 +16,36 @@ from utils.hyperparams import Params
 from data import get_multi30k_iters, batch_size_fn
 from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
 from finetune.agents import AgentsGumbel
-
-NB_RUNS = 5
+import argparse
 
 
 def get_args():
-    # Parse from cmd to get JSON
-    parsed_args, _ = Params.parse_cmd(sys.argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--outdir', required=True)
+    parser.add_argument('--exp_dir', required=True)
+    parser.add_argument('--data_dir', required=True)
+    parser.add_argument('--experiment', required=True)
+    parser.add_argument('--nb_runs', default=5, type=int)
+    parser.add_argument('--learning_steps', default=10000, type=int)
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--normalized', action='store_true')
+    parser.add_argument('--remove_dots', action='store_true')
+    parser.add_argument('--human', action='store_true')
+    parsed_args = parser.parse_args().__dict__
 
-    if 'config' in parsed_args:
-        print('Find json_config')
-        args = Params(parsed_args['config'])
-    else:
-        raise ValueError('You must pass in --config!')
+    print('###### CONFIG #########')
+    for key, val in parsed_args.items():
+        print('{}: {}'.format(key, val))
+    print('#######################')
 
+    # Try to load json
+    json_dir = os.path.join(parsed_args['exp_dir'], 'param', parsed_args['experiment'])
+    fnames = os.listdir(json_dir)
+    assert len(fnames) == 1, "More than one config file in the experiment!"
+    print('Find json_config', fnames[0])
+    params = Params(os.path.join(json_dir, fnames[0]))
+
+    # Create output dir
     if 'outdir' in parsed_args:
         print('storing result in {}'.format(parsed_args['outdir']))
         if os.path.exists(parsed_args['outdir']):
@@ -39,31 +55,27 @@ def get_args():
         raise ValueError('You must pass in --outdir')
 
     # Update some of them with command line
-    args.update(parsed_args)
-
-    if not hasattr(args, 'exp_dir'):
-        raise ValueError('You must provide exp_dir')
-    if not hasattr(args, 'data_dir'):
-        raise ValueError('You must provide data_dir')
-
-    assert args.experiment is not None and args.id_str is not None
-    print('Exp Dir:', args.exp_dir)
-    print('Experiment:', args.experiment)
-    print('Experiemnt ID', args.id_str)
-    return args
+    params.update(parsed_args)
+    return params
 
 
-def build_fr_en_it(multi30_it, teacher_model, train_repeat, batch_size, device):
+def build_fr_en_it(multi30_it, train_repeat, batch_size, device, teacher_model=None, remove_dots=False):
     """ Build an iterator from multi30k_data
-    with a teacher model for france to english """
-    teacher_model.eval()
-    fr_corpus, en_corpus = [], []
-    for batch in multi30_it:
-        en_msg, _ = teacher_model.fr_en_speak(batch)
-        fr_corpus.extend(teacher_model.FR.reverse(batch.fr[0], unbpe=True))
-        en_corpus.extend(teacher_model.EN.reverse(en_msg, unbpe=True))
-
-    fields = [('src', teacher_model.FR), ('trg', teacher_model.EN)]
+    with a teacher model for france to english. Use original Eng if teacher is None """
+    fr, en = multi30_it.dataset.fields['fr'], multi30_it.dataset.fields['en']
+    if teacher_model is not None:
+        teacher_model.eval()
+        fr_corpus, en_corpus = [], []
+        for batch in multi30_it:
+            en_msg, _ = teacher_model.fr_en_speak(batch)
+            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+            en_corpus.extend(en.reverse(en_msg, unbpe=True, remove_dots=remove_dots))
+    else:
+        en_corpus, fr_corpus = [], []
+        for batch in multi30_it:
+            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+            en_corpus.extend(en.reverse(batch.en[0], unbpe=True, remove_dots=remove_dots))
+    fields = [('src', fr), ('trg', en)]
     exs = [Example.fromlist(data=[fr_sent, en_sent], fields=fields)
            for fr_sent, en_sent in zip(fr_corpus, en_corpus)]
     dataset = Dataset(examples=exs, fields=fields)
@@ -147,19 +159,22 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
     writer.flush()
 
     # Return stats
-    stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
-    stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
+    if not args.normalized:
+        # Unnormalized
+        stats = {'dev/{}'.format(key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
+        stats.update({'train/{}'.format(key): train_metrics.metrics[key] for key in train_metrics.metrics})
+    else:
+        # Normalized
+        stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
+        stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
     stats['dev/bleu'] = dev_bleu[0]
     return stats
 
 
 def main():
-    args = get_args()
-
     # Read a list of checkpoint
     ckpt_dir = os.path.join(args.exp_dir, 'model', args.experiment)
     ckpts = [m for m in os.listdir(ckpt_dir) if 'iter=' in m and '.states' not in m]
-    print('Found {} checkpints'.format(len(ckpts)))
     ckpt_with_steps = {int(ckpt.split('.pt')[0].split('_iter=')[-1]): ckpt
                        for ckpt in ckpts}
     if args.debug:
@@ -167,6 +182,7 @@ def main():
         ckpt_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
     else:
         print('Debug mode off')
+    print('Found {} checkpints'.format(len(ckpt_with_steps)))
 
     # Data
     device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
@@ -201,20 +217,22 @@ def main():
         print('Load teacher from iter={}'.format(iter_step))
 
         # Generate New iterator
-        dev_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=False,
-                                device=device, batch_size=512)
+        remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
+        dev_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=False,
+                                device=device, batch_size=512,
+                                remove_dots=remove_dots)
         print('Build Dev dataset done')
 
         if args.debug:
-            train_it = build_fr_en_it(orig_dev_it, teacher, train_repeat=True,
-                                      device=device, batch_size=512)
+            train_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=True,
+                                      device=device, batch_size=512, remove_dots=remove_dots)
         else:
-            train_it = build_fr_en_it(orig_train_it, teacher, train_repeat=True,
-                                      device=device, batch_size=512)
+            train_it = build_fr_en_it(orig_train_it, teacher_model=teacher, train_repeat=True,
+                                      device=device, batch_size=512, remove_dots=remove_dots)
         print('Build Train dataset done')
 
         runs_stats = []
-        for run in range(NB_RUNS):
+        for run in range(args.nb_runs):
             # Start learning
             student = AgentsGumbel(args)
             student.cuda(args.gpu)
@@ -222,7 +240,7 @@ def main():
 
             stats = train_model(student.fr_en, train_it, dev_it,
                                 outdir=os.path.join(args.outdir, 'iters_{}_run_{}'.format(iter_step, run)),
-                                max_training_steps=100 if args.debug else 20000)
+                                max_training_steps=100 if args.debug else args.learning_steps)
             runs_stats.append(stats)
         statss.append(runs_stats)
 
@@ -235,7 +253,7 @@ def main():
     import numpy as np
     print('Start plotting...')
     NB_COL = 2
-    NB_ROW = int(len(statss[0])/2) + 1
+    NB_ROW = int((len(statss[0]) + 1)/2)
     fig, axs = plt.subplots(NB_ROW, 2, figsize=(8*NB_ROW, 10*NB_COL))
     for key, ax in zip(statss[0][0], axs.reshape(-1)):
         steps = sorted(ckpt_with_steps.keys())
@@ -251,7 +269,64 @@ def main():
     fig.savefig(os.path.join(args.outdir, 'plots.png'))
 
 
+def human_eot():
+    # Data
+    device = "cuda:{}".format(args.gpu) if args.gpu > -1 else "cpu"
+    bpe_path = os.path.join(args.data_dir, 'bpe')
+    en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
+    de, en, fr, orig_train_it, orig_dev_it = get_multi30k_iters(bpe_path=bpe_path, de_vocab=de_vocab, device=device,
+                                                                en_vocab=en_vocab, fr_vocab=fr_vocab,
+                                                                train_repeat=False,
+                                                                load_dataset=False,
+                                                                save_dataset=False,
+                                                                batch_size=512)
+    args.__dict__.update({'FR': fr, "DE": de, "EN": en})
+    args.__dict__.update({'pad_token': 0,
+                          'unk_token': 1,
+                          'init_token': 2,
+                          'eos_token': 3})
+
+    print('################################################')
+
+    # Generate New iterator
+    dev_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=False,
+                            device=device, batch_size=512,
+                            remove_dots=args.remove_dots)
+    print('Build Dev dataset done')
+
+    if args.debug:
+        train_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=True,
+                                  device=device, batch_size=512, remove_dots=args.remove_dots)
+    else:
+        train_it = build_fr_en_it(orig_train_it, teacher_model=None, train_repeat=True,
+                                  device=device, batch_size=512, remove_dots=args.remove_dots)
+    print('Build Train dataset done')
+
+    runs_stats = []
+    for run in range(args.nb_runs):
+        # Start learning
+        student = AgentsGumbel(args)
+        student.cuda(args.gpu)
+        print('Initial model done')
+
+        stats = train_model(student.fr_en, train_it, dev_it,
+                            outdir=os.path.join(args.outdir, 'human_run_{}'.format(run)),
+                            max_training_steps=100 if args.debug else args.nb_runs)
+        runs_stats.append(stats)
+
+    # Save to pickle
+    import pickle
+    with open(os.path.join(args.outdir, 'data.pkl'), 'wb') as f:
+        pickle.dump({'human_stats': runs_stats}, f)
+
+
 if __name__ == '__main__':
-    main()
+    args = get_args()
+    if 'human' in args.__dict__ and args.human:
+        print('Run Human EOT result')
+        human_eot()
+    else:
+        print('Run checkpoint EOT result')
+        main()
 
 
