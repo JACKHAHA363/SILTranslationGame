@@ -60,6 +60,24 @@ for file in tqdm(files):
 	for tag in TAGS:
 		pos_dist[tag] /= float(total_tags)
 	pos_dist_dict[file] = pos_dist
+
+# Compute KL, reverse KL and JS
+for name in pos_dist_dict:
+	if name == 'ref':
+		continue
+
+	ref_dist = pos_dist_dict['ref']
+	dist = pos_dist_dict[name]
+
+	kl_p_ref = 0
+	kl_ref_p = 0
+	for pos in TAGS:
+		ref_val = ref_dist.get(pos, 1e-16)
+		p_val = dist.get(pos, 1e-16)
+		kl_p_ref += p_val * (np.log(p_val) - np.log(ref_val))
+		kl_ref_p += ref_val * (np.log(ref_val) - np.log(p_val))
+	print('{}: KL_p_ref: {} KL_ref_p: {} JS: {}'.format(name, kl_p_ref, kl_ref_p, (kl_p_ref + kl_ref_p) / 2))
+
 fig, ax = plt.subplots(figsize=(8,6))
 plt.xticks([i for i in range(len(TAGS))], TAGS, fontsize=15)
 plt.yticks(fontsize=15)
