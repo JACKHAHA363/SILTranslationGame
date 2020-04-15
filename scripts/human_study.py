@@ -4,6 +4,7 @@ import string
 import random
 from itertools import product
 import csv
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-txt_dir', required=True)
@@ -44,12 +45,14 @@ while True:
 		print('Sentence ids generated!')
 		break
 
-info_to_id, id_to_info = {}, {}
+info2id, id2info = {}, {}
 for idx, info in enumerate(product(files, range(len(frs)))):
 	sent_id = sent_ids[idx]
-	info_to_id[info] = sent_id
-	id_to_info[sent_id] = info
+	info2id[info] = sent_id
+	id2info[sent_id] = info
 
+pickle.dump({'info2id': info2id,
+			 'id2info': id2info}, open(os.path.join(args.out_dir, 'data.pkl')))
 
 ex_ids = [i for i in range(len(frs))]
 for person_id in range(args.nb_csv):
@@ -66,8 +69,8 @@ for person_id in range(args.nb_csv):
 			writer.writerow(["Test{}".format(test_id), "", fr])
 			random.shuffle(files)
 			methodA, methodB = files[:2]
-			writer.writerow(["A", info_to_id[(methodA, ex_id)], data[methodA][ex_id]])
-			writer.writerow(["B", info_to_id[(methodB, ex_id)], data[methodB][ex_id]])
+			writer.writerow(["A", info2id[(methodA, ex_id)], data[methodA][ex_id]])
+			writer.writerow(["B", info2id[(methodB, ex_id)], data[methodB][ex_id]])
 			writer.writerow(["result", "?", ""])
 
 	# Exp1
@@ -78,6 +81,6 @@ for person_id in range(args.nb_csv):
 			writer.writerow(["Test{}".format(test_id), "", ""])
 			random.shuffle(files)
 			methodA, methodB = files[:2]
-			writer.writerow(["A", info_to_id[(methodA, ex_id)], data[methodA][ex_id]])
-			writer.writerow(["B", info_to_id[(methodB, ex_id)], data[methodB][ex_id]])
+			writer.writerow(["A", info2id[(methodA, ex_id)], data[methodA][ex_id]])
+			writer.writerow(["B", info2id[(methodB, ex_id)], data[methodB][ex_id]])
 			writer.writerow(["result", "?", ""])
