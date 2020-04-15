@@ -45,7 +45,7 @@ for person_id in range(args.nb_csv):
 		writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
 		for test_id, ex_id in enumerate(ex_ids[:args.nb_examples]):
 			fr = frs[ex_id]
-			writer.writerow(["Test{}".format(test_id), fr])
+			writer.writerow(["", fr])
 			random.shuffle(files)
 			methodA, methodB = files[:2]
 			writer.writerow(["A", hyps[methodA][ex_id]])
@@ -58,7 +58,6 @@ for person_id in range(args.nb_csv):
 	with open(os.path.join(args.outdir, 'wo_src_{}.csv'.format(person_id)), 'w', newline='') as csvfile:
 		writer = csv.writer(csvfile, quoting=csv.QUOTE_NONNUMERIC)
 		for test_id, ex_id in enumerate(ex_ids[-args.nb_examples:]):
-			writer.writerow(["Test{}".format(test_id), ""])
 			random.shuffle(files)
 			methodA, methodB = files[:2]
 			writer.writerow(["A", hyps[methodA][ex_id]])
