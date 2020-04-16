@@ -28,7 +28,6 @@ def get_args():
     parser.add_argument('--nb_runs', default=5, type=int)
     parser.add_argument('--learning_steps', default=10000, type=int)
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--normalized', action='store_true')
     parser.add_argument('--remove_dots', action='store_true')
     parser.add_argument('--human', action='store_true')
     parsed_args = parser.parse_args().__dict__
@@ -172,14 +171,13 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps, prefix):
     writer.flush()
 
     # Return stats
-    if not args.normalized:
-        # Unnormalized
-        stats = {'{}/dev/{}'.format(prefix, key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
-        stats.update({'{}/train/{}'.format(prefix, key): train_metrics.metrics[key] for key in train_metrics.metrics})
-    else:
-        # Normalized
-        stats = {'{}/dev/{}'.format(prefix, key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
-        stats.update({'{}/train/{}'.format(prefix, key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
+    stats = {'{}/dev/unnorm/{}'.format(prefix, key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
+    stats.update({'{}/train/unnorm/{}'.format(prefix, key): train_metrics.metrics[key]
+                  for key in train_metrics.metrics})
+    stats.update({'{}/dev/norm/{}'.format(prefix, key): dev_metrics.__getattr__(key)
+                      for key in dev_metrics.metrics})
+    stats.update({'{}/train/norm/{}'.format(prefix, key): train_metrics.__getattr__(key)
+                  for key in train_metrics.metrics})
     stats['{}/bleu'.format(prefix)] = dev_bleu[0]
     return stats
 
@@ -192,7 +190,7 @@ def main():
                        for ckpt in ckpts}
     if args.debug:
         print('Debug mode on')
-        ckpt_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:5]}
+        ckpt_with_steps = {step: ckpt_with_steps[step] for step in sorted(ckpt_with_steps.keys())[:3]}
     else:
         print('Debug mode off')
     print('Found {} checkpints'.format(len(ckpt_with_steps)))
@@ -273,7 +271,7 @@ def main():
     print('Start plotting...')
     NB_COL = 2
     NB_ROW = int((len(statss[0][0]) + 1)/2)
-    fig, axs = plt.subplots(NB_ROW, 2, figsize=(8*NB_ROW, 10*NB_COL))
+    fig, axs = plt.subplots(NB_ROW, 2, figsize=(10*NB_COL, 10*NB_ROW))
     for key, ax in zip(statss[0][0], axs.reshape(-1)):
         steps = sorted(ckpt_with_steps.keys())
         values = [[stats[key] for stats in run_stats] for run_stats in statss]
