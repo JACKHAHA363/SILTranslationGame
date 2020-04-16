@@ -59,32 +59,44 @@ def get_args():
     return params
 
 
-def build_fr_en_it(multi30_it, train_repeat, batch_size, device, teacher_model=None, remove_dots=False):
+def build_mt_it(multi30_it, train_repeat, batch_size, device, teacher_model=None, remove_dots=False):
     """ Build an iterator from multi30k_data
     with a teacher model for france to english. Use original Eng if teacher is None """
-    fr, en = multi30_it.dataset.fields['fr'], multi30_it.dataset.fields['en']
+    fr, en, de = multi30_it.dataset.fields['fr'], multi30_it.dataset.fields['en'], multi30_it.dataset.fields['de']
+    fr_corpus, en_corpus, de_corpus = [], [], []
     if teacher_model is not None:
         teacher_model.eval()
-        fr_corpus, en_corpus = [], []
-        for batch in multi30_it:
+    for batch in multi30_it:
+        fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+        de_corpus.extend(de.reverse(batch.de[0], unbpe=True))
+        if teacher_model is not None:
             en_msg, _ = teacher_model.fr_en_speak(batch)
-            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
             en_corpus.extend(en.reverse(en_msg, unbpe=True, remove_dots=remove_dots))
-    else:
-        en_corpus, fr_corpus = [], []
-        for batch in multi30_it:
-            fr_corpus.extend(fr.reverse(batch.fr[0], unbpe=True))
+        else:
             en_corpus.extend(en.reverse(batch.en[0], unbpe=True, remove_dots=remove_dots))
+
+    # Fr-En
     fields = [('src', fr), ('trg', en)]
     exs = [Example.fromlist(data=[fr_sent, en_sent], fields=fields)
            for fr_sent, en_sent in zip(fr_corpus, en_corpus)]
     dataset = Dataset(examples=exs, fields=fields)
-    it = BucketIterator(dataset, batch_size, device=device,
-                        batch_size_fn=batch_size_fn,
-                        repeat=train_repeat, shuffle=True,
-                        sort=False, sort_within_batch=True,
-                        sort_key=lambda ex: interleave_keys(len(ex.src), len(ex.trg)))
-    return it
+    fr_en_it = BucketIterator(dataset, batch_size, device=device,
+                              batch_size_fn=batch_size_fn,
+                              repeat=train_repeat, shuffle=True,
+                              sort=False, sort_within_batch=True,
+                              sort_key=lambda ex: interleave_keys(len(ex.src), len(ex.trg)))
+
+    # En-De
+    fields = [('src', en), ('trg', de)]
+    exs = [Example.fromlist(data=[en_sent, de_sent], fields=fields)
+           for en_sent, de_sent in zip(en_corpus, de_corpus)]
+    dataset = Dataset(examples=exs, fields=fields)
+    en_de_it = BucketIterator(dataset, batch_size, device=device,
+                              batch_size_fn=batch_size_fn,
+                              repeat=train_repeat, shuffle=True,
+                              sort=False, sort_within_batch=True,
+                              sort_key=lambda ex: interleave_keys(len(ex.src), len(ex.trg)))
+    return fr_en_it, en_de_it
 
 
 def valid_model(model, dev_it, dev_metrics):
@@ -111,7 +123,7 @@ def valid_model(model, dev_it, dev_metrics):
     return bleu
 
 
-def train_model(model, train_it, dev_it, outdir, max_training_steps):
+def train_model(model, train_it, dev_it, outdir, max_training_steps, prefix):
     """ supervise learning on the dataset """
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.Adam(params, betas=(0.9, 0.98), eps=1e-9, lr=1e-4)
@@ -127,9 +139,9 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
         if iters % 1000 == 0:
             dev_metrics.reset()
             dev_bleu = valid_model(model, dev_it, dev_metrics)
-            write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
+            write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="{}/dev/".format(prefix))
             write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'],
-                     dev_bleu, iters, prefix="bleu/")
+                     dev_bleu, iters, prefix="{}/bleu/".format(prefix))
 
         model.train()
         src, src_len = train_batch.src
@@ -147,27 +159,28 @@ def train_model(model, train_it, dev_it, outdir, max_training_steps):
 
         if iters % 200 == 0:
             print("update {} : {}".format(iters, str(train_metrics)))
-            write_tb(writer, ['nll', 'lr'], [train_metrics.nll, opt.param_groups[0]['lr']], iters, prefix="train/")
+            write_tb(writer, ['nll', 'lr'], [train_metrics.nll, opt.param_groups[0]['lr']], iters,
+                     prefix="{}/train/".format(prefix))
             train_metrics.reset()
 
     # Final evaluation
     dev_metrics.reset()
     dev_bleu = valid_model(model, dev_it, dev_metrics)
-    write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
+    write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="{}/dev/".format(prefix))
     write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'],
-             dev_bleu, iters, prefix="bleu/")
+             dev_bleu, iters, prefix="{}/bleu/".format(prefix))
     writer.flush()
 
     # Return stats
     if not args.normalized:
         # Unnormalized
-        stats = {'dev/{}'.format(key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
-        stats.update({'train/{}'.format(key): train_metrics.metrics[key] for key in train_metrics.metrics})
+        stats = {'{}/dev/{}'.format(prefix, key): dev_metrics.metrics[key] for key in dev_metrics.metrics}
+        stats.update({'{}/train/{}'.format(prefix, key): train_metrics.metrics[key] for key in train_metrics.metrics})
     else:
         # Normalized
-        stats = {'dev/{}'.format(key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
-        stats.update({'train/{}'.format(key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
-    stats['dev/bleu'] = dev_bleu[0]
+        stats = {'{}/dev/{}'.format(prefix, key): dev_metrics.__getattr__(key) for key in dev_metrics.metrics}
+        stats.update({'{}/train/{}'.format(prefix, key): train_metrics.__getattr__(key) for key in train_metrics.metrics})
+    stats['{}/bleu'.format(prefix)] = dev_bleu[0]
     return stats
 
 
@@ -218,17 +231,17 @@ def main():
 
         # Generate New iterator
         remove_dots = hasattr(args, 'remove_dots') and args.remove_dots
-        dev_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=False,
-                                device=device, batch_size=512,
-                                remove_dots=remove_dots)
+        dev_fr_en_it, dev_en_de_it = build_mt_it(orig_dev_it, teacher_model=teacher, train_repeat=False,
+                                                 device=device, batch_size=512,
+                                                remove_dots=remove_dots)
         print('Build Dev dataset done')
 
         if args.debug:
-            train_it = build_fr_en_it(orig_dev_it, teacher_model=teacher, train_repeat=True,
-                                      device=device, batch_size=512, remove_dots=remove_dots)
+            train_fr_en_it, train_en_de_it = build_mt_it(orig_dev_it, teacher_model=teacher, train_repeat=True,
+                                                         device=device, batch_size=512, remove_dots=remove_dots)
         else:
-            train_it = build_fr_en_it(orig_train_it, teacher_model=teacher, train_repeat=True,
-                                      device=device, batch_size=512, remove_dots=remove_dots)
+            train_fr_en_it, train_en_de_it = build_mt_it(orig_train_it, teacher_model=teacher, train_repeat=True,
+                                                         device=device, batch_size=512, remove_dots=remove_dots)
         print('Build Train dataset done')
 
         runs_stats = []
@@ -237,10 +250,16 @@ def main():
             student = AgentsGumbel(args)
             student.cuda(args.gpu)
             print('Initial model done')
-
-            stats = train_model(student.fr_en, train_it, dev_it,
+            print('Learn Fr->En')
+            stats = train_model(student.fr_en, train_fr_en_it, dev_fr_en_it,
                                 outdir=os.path.join(args.outdir, 'iters_{}_run_{}'.format(iter_step, run)),
-                                max_training_steps=100 if args.debug else args.learning_steps)
+                                max_training_steps=100 if args.debug else args.learning_steps,
+                                prefix='fr_en')
+            print('Learn En->De')
+            stats.update(train_model(student.en_de, train_en_de_it, dev_en_de_it,
+                                     outdir=os.path.join(args.outdir, 'iters_{}_run_{}'.format(iter_step, run)),
+                                     max_training_steps=100 if args.debug else args.learning_steps,
+                                     prefix='en_de'))
             runs_stats.append(stats)
         statss.append(runs_stats)
 
@@ -253,7 +272,7 @@ def main():
     import numpy as np
     print('Start plotting...')
     NB_COL = 2
-    NB_ROW = int((len(statss[0]) + 1)/2)
+    NB_ROW = int((len(statss[0][0]) + 1)/2)
     fig, axs = plt.subplots(NB_ROW, 2, figsize=(8*NB_ROW, 10*NB_COL))
     for key, ax in zip(statss[0][0], axs.reshape(-1)):
         steps = sorted(ckpt_with_steps.keys())
@@ -289,17 +308,17 @@ def human_eot():
     print('################################################')
 
     # Generate New iterator
-    dev_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=False,
-                            device=device, batch_size=512,
-                            remove_dots=args.remove_dots)
+    dev_it = build_mt_it(orig_dev_it, teacher_model=None, train_repeat=False,
+                         device=device, batch_size=512,
+                         remove_dots=args.remove_dots)
     print('Build Dev dataset done')
 
     if args.debug:
-        train_it = build_fr_en_it(orig_dev_it, teacher_model=None, train_repeat=True,
-                                  device=device, batch_size=512, remove_dots=args.remove_dots)
+        train_it = build_mt_it(orig_dev_it, teacher_model=None, train_repeat=True,
+                               device=device, batch_size=512, remove_dots=args.remove_dots)
     else:
-        train_it = build_fr_en_it(orig_train_it, teacher_model=None, train_repeat=True,
-                                  device=device, batch_size=512, remove_dots=args.remove_dots)
+        train_it = build_mt_it(orig_train_it, teacher_model=None, train_repeat=True,
+                               device=device, batch_size=512, remove_dots=args.remove_dots)
     print('Build Train dataset done')
 
     runs_stats = []
