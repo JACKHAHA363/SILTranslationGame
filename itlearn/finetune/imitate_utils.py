@@ -68,7 +68,8 @@ def _s2p_loss_real(args, model, iwslt_it, multi30k_it, src_name, trg_name):
     return nll
 
 
-def _fr_en_imitate_loss(args, batch, student, teacher):
+def _fr_en_imitate_loss(args, train_it, student, teacher):
+    batch = train_it.__next__()
     with torch.no_grad():
         teacher.eval()
         if args.send_method == 'argmax':
@@ -83,7 +84,8 @@ def _fr_en_imitate_loss(args, batch, student, teacher):
     return nll
 
 
-def _en_de_imitate_loss(args, batch, student, teacher):
+def _en_de_imitate_loss(args, train_it, student, teacher):
+    batch = train_it.__next__()
     # Teacher generate message
     with torch.no_grad():
         teacher.eval()
@@ -104,8 +106,9 @@ def _en_de_imitate_loss(args, batch, student, teacher):
     return nll
 
 
-def _en_de_finetune_loss(args, batch, student, teacher):
+def _en_de_finetune_loss(args, train_it, student, teacher):
     # Teacher generate message
+    batch = train_it.__next__()
     with torch.no_grad():
         teacher.eval()
         if args.send_method == 'argmax':
@@ -149,14 +152,12 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
                                       src_name='fr', trg_name='en')
             else:
                 # Imitate
-                batch = train_it.__next__()
-                loss = _fr_en_imitate_loss(args, batch, student, teacher)
+                loss = _fr_en_imitate_loss(args, train_it, student, teacher)
 
         elif args.sil_s2p_mode == 'interp':
             s2p_loss = _s2p_loss_real(args, student.fr_en, s2p_fr_en_it, train_it,
                                       src_name='fr', trg_name='en')
-            batch = train_it.__next__()
-            sil_loss = _fr_en_imitate_loss(args, batch, student, teacher)
+            sil_loss = _fr_en_imitate_loss(args, train_it, student, teacher)
             loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
         else:
             raise ValueError
@@ -165,6 +166,12 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
         opt.zero_grad()
         loss.backward()
         opt.step()
+        if args.debug and iters % eval_freq == 0:
+            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+                                   if param.grad is not None])
+            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+                                   if param.grad is not None])
+            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
         iters += 1
     return imitate_statss
 
@@ -175,8 +182,10 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
                                                                     args.sil_s2p_mode))
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
+    iters = 0
     s2p_en_de_it = iter(extra_input['s2p_its']['en_de'])
-    for iters, batch in enumerate(train_it):
+    train_it = iter(train_it)
+    while True:
         if iters >= args.en_de_k2:
             args.logger.info('student en de stop learning after {} steps'.format(args.en_de_k2))
             break
@@ -194,14 +203,12 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
                                       src_name='en', trg_name='de')
             else:
                 # Imitate
-                batch = train_it.__next__()
-                loss = _en_de_imitate_loss(args, batch, student, teacher)
+                loss = _en_de_imitate_loss(args, train_it, student, teacher)
 
         elif args.sil_s2p_mode == 'interp':
             s2p_loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
                                       src_name='en', trg_name='de')
-            batch = train_it.__next__()
-            sil_loss = _en_de_finetune_loss(args, batch, student, teacher)
+            sil_loss = _en_de_imitate_loss(args, train_it, student, teacher)
             loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
         else:
             raise ValueError
@@ -209,6 +216,13 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
         opt.zero_grad()
         loss.backward()
         opt.step()
+        if args.debug and iters % eval_freq == 0:
+            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+                                   if param.grad is not None])
+            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+                                   if param.grad is not None])
+            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
+        iters += 1
     return imitate_statss
 
 
@@ -219,8 +233,10 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
                                                                      args.sil_s2p_mode))
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
+    iters = 0
     s2p_en_de_it = iter(extra_input['s2p_its']['en_de'])
-    for iters, batch in enumerate(train_it):
+    train_it = iter(train_it)
+    while True:
         if iters >= args.en_de_k2:
             args.logger.info('student en de stop finetuning after {} steps'.format(args.en_de_k2))
             break
@@ -238,14 +254,12 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
                                       src_name='en', trg_name='de')
             else:
                 # Imitate
-                batch = train_it.__next__()
-                loss = _en_de_imitate_loss(args, batch, student, teacher)
+                loss = _en_de_finetune_loss(args, train_it, student, teacher)
 
         elif args.sil_s2p_mode == 'interp':
             s2p_loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
                                       src_name='en', trg_name='de')
-            batch = train_it.__next__()
-            sil_loss = _en_de_imitate_loss(args, batch, student, teacher)
+            sil_loss = _en_de_finetune_loss(args, train_it, student, teacher)
             loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
         else:
             raise ValueError
@@ -253,6 +267,13 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
         opt.zero_grad()
         loss.backward()
         opt.step()
+        if args.debug and iters % eval_freq == 0:
+            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+                                   if param.grad is not None])
+            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+                                   if param.grad is not None])
+            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
+        iters += 1
     return imitate_statss
 
 

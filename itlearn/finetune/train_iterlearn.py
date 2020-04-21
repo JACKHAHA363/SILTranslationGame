@@ -71,11 +71,10 @@ def selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor
 
 def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names, monitor_names):
     # Writer
-    if not args.debug:
-        decoding_path = Path(args.decoding_path + args.id_str)
-        decoding_path.mkdir(parents=True, exist_ok=True)
-        from tensorboardX import SummaryWriter
-        writer = SummaryWriter( args.event_path + args.id_str)
+    decoding_path = Path(args.decoding_path + args.id_str)
+    decoding_path.mkdir(parents=True, exist_ok=True)
+    from tensorboardX import SummaryWriter
+    writer = SummaryWriter( args.event_path + args.id_str)
 
     # Opt
     params = [p for p in model.parameters() if p.requires_grad]
