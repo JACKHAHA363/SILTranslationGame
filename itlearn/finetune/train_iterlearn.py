@@ -163,11 +163,11 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
             if not args.en_de_finetune:
                 en_de_statss = imitate_en_de(args, student=student,
                                              teacher=model, train_it=train_it, dev_it=dev_it,
-                                             opt=stu_en_de_opt)
+                                             opt=stu_en_de_opt, extra_input=extra_input)
             else:
                 en_de_statss = finetune_en_de(args, student=student,
                                               teacher=model, train_it=train_it, dev_it=dev_it,
-                                              opt=stu_en_de_opt)
+                                              opt=stu_en_de_opt, extra_input=extra_input)
 
             # Report change of student and teacher
             teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
