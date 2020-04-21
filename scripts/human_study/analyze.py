@@ -8,6 +8,7 @@ import os
 import pickle
 import ipdb
 import numpy as np
+from pandas import DataFrame
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-csv_dir', required=True)
@@ -52,8 +53,8 @@ def read_csv(csv_path):
             ipdb.set_trace()
 
     # Deal with results
-    conf_mat = np.zeros([len(methods), len(methods)])
-    nb_tests = 0
+    win_mat = np.zeros([len(methods), len(methods)])
+    count_mat = np.zeros([len(methods), len(methods)])
     for result in results:
         id1, score1 = result[0]
         id2, score2 = result[1]
@@ -68,51 +69,63 @@ def read_csv(csv_path):
             continue
         if score1 == "" or score2 == "":
             continue
-        score1 = int(score1)
-        score2 = int(score2)
-        nb_tests += 1
         if score1 > score2:
-            conf_mat[method1, method2] += 1
-            conf_mat[method2, method1] -= 1
-        elif score1 < score2:
-            conf_mat[method1, method2] -= 1
-            conf_mat[method2, method1] += 1
-    return conf_mat, nb_tests
+            win_mat[method1, method2] += 1
+        if score2 > score1:
+            win_mat[method2, method1] += 1
+        count_mat[method1, method2] += 1
+        count_mat[method2, method1] += 1
+    return win_mat, count_mat
 
 
-w_src_tests = 0
-w_src_conf_mat = np.zeros([len(methods), len(methods)])
-for w_src_file in w_src:
-    conf_mat, nb_tests = read_csv(os.path.join(args.csv_dir, w_src_file))
-    if nb_tests == 0:
-        print('0 result', w_src_file)
-    w_src_tests += nb_tests
-    w_src_conf_mat += conf_mat
-
-wo_src_tests = 0
-wo_src_conf_mat = np.zeros([len(methods), len(methods)])
-for wo_src_file in wo_src:
-    conf_mat, nb_tests = read_csv(os.path.join(args.csv_dir, wo_src_file))
-    wo_src_tests += nb_tests
-    if nb_tests == 0:
-        print('0 result', wo_src_file)
-    wo_src_conf_mat += conf_mat
+def accumulate_csvs(csv_files):
+    total_win_mat = np.zeros([len(methods), len(methods)])
+    total_count_mat = np.zeros([len(methods), len(methods)])
+    for file in csv_files:
+        win_mat, count_mat = read_csv(os.path.join(args.csv_dir, file))
+        total_count_mat += count_mat
+        total_win_mat += win_mat
+        if count_mat.sum() == 0:
+            print('0 result', file)
+    return total_win_mat, total_count_mat
 
 
-def visualize(conf_mat, nb_tests):
-    from pandas import DataFrame
-    df = DataFrame(np.concatenate([conf_mat, conf_mat.sum(-1).reshape([-1, 1])], -1),
-                   index=methods, columns=methods + ['SUM'])
+def visualize(total_win_mat, total_count_mat):
+    print('Win Ratio')
+    win_ratio = total_win_mat / total_count_mat
+    for i in range(len(methods)):
+        win_ratio[i, i] = 0
+    df = DataFrame(win_ratio, index=methods, columns=methods)
     print(df)
-    print('Nb. pairs tested:', nb_tests)
 
+    print('Tie Ratio')
+    tie_ratio = np.zeros([len(methods), len(methods)])
+    for i in range(len(methods)):
+        for j in range(len(methods)):
+            tie_ratio[i, j] = 1 - (win_ratio[i, j] + win_ratio[j, i])
+    df = DataFrame(tie_ratio,
+                   index=methods, columns=methods)
+    print(df)
 
-print('With French')
-visualize(w_src_conf_mat, w_src_tests)
-print('Without French')
-visualize(wo_src_conf_mat, wo_src_tests)
+    print('Adjusted Win Ratio')
+    adjusted_win_ratio = np.zeros([len(methods), len(methods)])
+    for i in range(len(methods)):
+        for j in range(len(methods)):
+            if i == j:
+                continue
+            adjusted_win_ratio[i, j] = win_ratio[i, j] / float(win_ratio[i, j] + win_ratio[j, i])
+    print(DataFrame(np.concatenate([adjusted_win_ratio, adjusted_win_ratio.sum(-1).reshape([-1, 1])], -1),
+                    index=methods, columns=methods + ['SUM']))
 
-def rank_by_winning_score(conf_mat):
-    scores = conf_mat.sum(-1)
-    print('')
+    print('Nb. pairs tested:', total_count_mat.sum())
+    df = DataFrame(total_count_mat,
+                   index=methods, columns=methods)
+    print(df)
 
+wo_total_win_mat, wo_total_count_mat = accumulate_csvs(wo_src)
+w_total_win_mat, w_total_count_mat = accumulate_csvs(w_src)
+print('############# Without French #############')
+visualize(wo_total_win_mat, wo_total_count_mat)
+
+print('############## With French ###############')
+visualize(w_total_win_mat, w_total_count_mat)
