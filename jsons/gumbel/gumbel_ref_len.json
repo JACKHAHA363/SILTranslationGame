@@ -47,8 +47,6 @@
     "lr_min": 1e-05,
     "linear_anneal_steps": 50000,
     "max_training_steps": 100000,
-    "send_method": "reinforce",
-    "decode_method": "greedy",
     "max_len_gen": 40,
     "min_len_gen": 3,
     "msg_len_ratio": 1.0,

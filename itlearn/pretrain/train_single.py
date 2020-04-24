@@ -80,7 +80,7 @@ def train_model(args, model, iterators):
 
         if iters % args.eval_every == 0:
             dev_metrics.reset()
-            dev_bleu = valid_model(args, model, dev_it, dev_metrics, args.decode_method)
+            dev_bleu = valid_model(args, model, dev_it, dev_metrics, 'argmax')
             if not args.debug:
                 write_tb(writer, ['nll'], [dev_metrics.nll], iters, prefix="dev/")
                 write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()) , 'bp', 'len_ref', 'len_hyp'], dev_bleu, iters, prefix="bleu/")

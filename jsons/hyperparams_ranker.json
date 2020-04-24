@@ -41,7 +41,6 @@
     "margin": 0,
     "D_img": 2048,
 
-    "decode_method": "greedy",
     "max_len_gen": 50,
     "min_len_gen": 3,
     "training_max_len": null,

@@ -37,7 +37,6 @@
     "linear_anneal_steps": 500000,
     "max_training_steps": 1000000,
 
-    "decode_method": "greedy",
     "beam_width": 5,
     "beam_alpha": 0.6,
     "max_len_gen": 50,
