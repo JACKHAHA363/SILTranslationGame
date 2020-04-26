@@ -8,7 +8,7 @@ from torch.nn import Linear, Module
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from itlearn.utils.misc import cuda, xlen_to_inv_mask, gumbel_softmax
+from itlearn.utils.misc import cuda, xlen_to_inv_mask, gumbel_softmax, first_appear_indice
 from itlearn.models.modules import ArgsModule
 
 
@@ -107,7 +107,7 @@ class RNNDecAttn(ArgsModule):
 
         return x
 
-    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None, gumbel_temp=1):
+    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None, gumbel_temp=1, dot_token=None):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)
         # src_len : (batch_size)
         batch_size, x_seq_len = src_hid.size()[:2]
@@ -208,7 +208,9 @@ class RNNDecAttn(ArgsModule):
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
 
         # Trim sequence length with first dot tensor
-        if self.trim_dots:
+        if dot_token is not None:
+            import ipdb; ipdb.set_trace()
+            seq_lens = first_appear_indice(msg, dot_token) + 1
             pass
 
         # Jason's trick on trim the sentence length based on ground truth length

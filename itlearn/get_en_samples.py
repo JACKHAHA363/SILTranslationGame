@@ -81,7 +81,8 @@ def iwslt_loop():
             fr, fr_len = dev_batch.src
             _, en_len = dev_batch.trg
             fr_hid = model.fr_en.enc(fr, fr_len)
-            send_results = model.fr_en.dec.send(fr_hid, fr_len, en_len - 1, 'argmax')
+            send_results = model.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len,
+                                                trg_len=en_len - 1, send_method='argmax')
             en = send_results["msg"]
             en_hyp.extend(args.EN.reverse(en, unbpe=True))
         return en_corpus, en_hyp
