@@ -53,8 +53,8 @@ class RNNDecAttn(ArgsModule):
 
         self.layers = nn.ModuleList([\
             nn.GRUCell(
-                input_size = args.D_emb + args.D_hid if layer == 0 and args.input_feeding else args.D_emb,
-                hidden_size = args.D_hid,
+                input_size=args.D_emb + args.D_hid if layer == 0 and args.input_feeding else args.D_emb,
+                hidden_size=args.D_hid,
             )
             for layer in range(args.n_layers)
         ])
@@ -62,8 +62,6 @@ class RNNDecAttn(ArgsModule):
         self.attention = AttentionLayer(args.D_hid, args.D_hid) if self.model == "RNNAttn" else None
 
         self.out = nn.Linear(args.D_hid, voc_sz_trg)
-        #if args.tie_emb and (args.D_hid == args.D_emb):
-        #    self.out.weight = self.emb.weight
 
     def forward(self, src_hid, src_len, trg_tok):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)
@@ -208,11 +206,18 @@ class RNNDecAttn(ArgsModule):
             self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
-        # NOTE en_msg_len = min( en_ref_len, whenever the model decides to output <EOS> symbol )
+
+        # Trim sequence length with first dot tensor
+        if self.trim_dots:
+            pass
+
+        # Jason's trick on trim the sentence length based on ground truth length
         if self.msg_len_ratio > 0:
-            en_ref_len = torch.floor( trg_len.float() * self.msg_len_ratio ).long()
-            seq_lens = torch.max(torch.min( seq_lens, en_ref_len ),
-                                 seq_lens.new(seq_lens.size()).fill_(self.min_len_gen) )
+            en_ref_len = torch.floor(trg_len.float() * self.msg_len_ratio).long()
+            seq_lens = torch.min(seq_lens, en_ref_len)
+
+        # Make length larger than min len
+        seq_lens = torch.max(seq_lens, seq_lens.new(seq_lens.size()).fill_(self.min_len_gen))
 
         # Make sure message is valid
         ends_with_eos = (msg.gather(dim=1, index=(seq_lens-1)[:, None]).view(-1) == eos_tensor).long()
@@ -234,11 +239,6 @@ class RNNDecAttn(ArgsModule):
         msg_mask = xlen_to_inv_mask(seq_lens, seq_len=msg.size(1)) # (batch_size, x_seq_len)
         msg.masked_fill_(msg_mask.bool(), self.pad_token)
         result.update({"msg": msg, "new_seq_lens": seq_lens})
-        #if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
-        #    batch_ids, len_ids = torch.where(msg_mask.bool())
-        #    zeros = cuda(torch.zeros_like(batch_ids).long())
-        #    self.gumbel_tokens[batch_ids, len_ids] = 0
-        #    self.gumbel_tokens[batch_ids, len_ids, zeros] = 1
         return result
 
     def beam(self, src_hid, src_len):
