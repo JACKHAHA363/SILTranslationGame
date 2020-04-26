@@ -48,7 +48,8 @@ class RNNAttn(ArgsModule):
     def decode(self, x, x_len, decode_method, beam_width):
         hid = self.enc(x, x_len) # (batch_size, x_seq_len, num_dir_enc * D_hid_enc)
         if decode_method == "greedy":
-            hyp = self.dec.send(hid, x_len, None, "argmax", None)['msg']
+            hyp = self.dec.send(src_hid=hid, src_len=x_len, trg_len=None,
+                                send_method="argmax")['msg']
             hyp = hyp.cpu().numpy().tolist()
         elif decode_method == "beam":
             hyp = self.dec.beam(hid, x_len)

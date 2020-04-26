@@ -63,10 +63,10 @@ class Series:
             assert self.steps[i] <= self.steps[i + 1]
 
 
-def combine_series(series_list):
+def combine_series(series_list, use_median=False):
     """
     :param series_list: a list of `Series` assuming steps are aligned
-    :return: steps, means, stds
+    :return: steps, values, stds
     """
     step_sizes = [len(series.steps) for series in series_list]
     min_idx = np.argmin(step_sizes)
@@ -74,9 +74,12 @@ def combine_series(series_list):
 
     # [nb_run, nb_steps]
     all_values = [series.values[:len(steps)] for series in series_list]
-    means = np.mean(all_values, axis=0)
+    if not use_median:
+        values = np.mean(all_values, axis=0)
+    else:
+        values = np.median(all_values, axis=0)
     stds = np.std(all_values, axis=0)
-    return steps, means, stds
+    return steps, values, stds
 
 
 def parse_tb_event_file(event_file):
@@ -97,11 +100,12 @@ def parse_tb_event_file(event_file):
     return data
 
 
-def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size):
+def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size, use_median):
     data = {}
     min_steps = math.inf
     for exp_name in exp_names:
-        steps, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]])
+        steps, means, stds = combine_series([run_data[tag] for run_data in all_data[exp_name]],
+                                            use_median=use_median)
         data[exp_name] = (steps, means, stds)
         if steps[-1] < min_steps:
             min_steps = steps[-1]
@@ -136,6 +140,7 @@ def main():
     parser.add_argument('exp_dir')
     parser.add_argument('output_dir')
     parser.add_argument('-same_canvas', action='store_true')
+    parser.add_argument('-use_median', action='store_true')
     args = parser.parse_args()
 
     exp_names = os.listdir(args.exp_dir)
@@ -178,7 +183,7 @@ def main():
         fig, axs = plt.subplots(int(len(all_tags)/2) + 1, 2, figsize=(8*(int(len(all_tags)/2) + 1), 20))
         for tag, ax in zip(all_tags, axs.reshape([-1])):
             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10)
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10, use_median=args.use_median)
         fig.savefig(os.path.join(args.output_dir, 'result.png'))
     else:
         matplotlib.rc('font', size=20)

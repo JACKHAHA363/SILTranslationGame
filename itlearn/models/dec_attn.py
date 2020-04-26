@@ -8,7 +8,7 @@ from torch.nn import Linear, Module
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from itlearn.utils.misc import cuda, xlen_to_inv_mask, gumbel_softmax
+from itlearn.utils.misc import cuda, xlen_to_inv_mask, gumbel_softmax, first_appear_indice
 from itlearn.models.modules import ArgsModule
 
 
@@ -53,8 +53,8 @@ class RNNDecAttn(ArgsModule):
 
         self.layers = nn.ModuleList([\
             nn.GRUCell(
-                input_size = args.D_emb + args.D_hid if layer == 0 and args.input_feeding else args.D_emb,
-                hidden_size = args.D_hid,
+                input_size=args.D_emb + args.D_hid if layer == 0 and args.input_feeding else args.D_emb,
+                hidden_size=args.D_hid,
             )
             for layer in range(args.n_layers)
         ])
@@ -62,8 +62,6 @@ class RNNDecAttn(ArgsModule):
         self.attention = AttentionLayer(args.D_hid, args.D_hid) if self.model == "RNNAttn" else None
 
         self.out = nn.Linear(args.D_hid, voc_sz_trg)
-        #if args.tie_emb and (args.D_hid == args.D_emb):
-        #    self.out.weight = self.emb.weight
 
     def forward(self, src_hid, src_len, trg_tok):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)
@@ -109,7 +107,7 @@ class RNNDecAttn(ArgsModule):
 
         return x
 
-    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None, gumbel_temp=1):
+    def send(self, src_hid, src_len, trg_len, send_method, value_fn=None, gumbel_temp=1, dot_token=None):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)
         # src_len : (batch_size)
         batch_size, x_seq_len = src_hid.size()[:2]
@@ -166,9 +164,6 @@ class RNNDecAttn(ArgsModule):
             input_feed = out
             logit = self.out(out) # (batch_size, voc_sz_trg)
 
-            #if send_method == "reinforce" and idx < self.min_len_gen:
-            #    logit[:, self.eos_token] = float('-inf') # NOTE force not to generate messages too short
-
             if send_method == "argmax":
                 tokens = logit.max(dim=1)[1] # (batch_size)
 
@@ -176,8 +171,6 @@ class RNNDecAttn(ArgsModule):
                 tok_dist = Categorical(logits=logit)
                 tokens = tok_dist.sample()
                 self.log_probs.append(tok_dist.log_prob(tokens)) # (batch_size)
-
-                #if idx >= self.min_len_gen:
                 self.neg_Hs.append(-1 * tok_dist.entropy())
 
             elif send_method == "gumbel":
@@ -213,21 +206,29 @@ class RNNDecAttn(ArgsModule):
             self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
-        # NOTE en_msg_len = min( en_ref_len, whenever the model decides to output <EOS> symbol )
+
+        # Trim sequence length with first dot tensor
+        if dot_token is not None:
+            import ipdb; ipdb.set_trace()
+            seq_lens = first_appear_indice(msg, dot_token) + 1
+            pass
+
+        # Jason's trick on trim the sentence length based on ground truth length
         if self.msg_len_ratio > 0:
-            en_ref_len = torch.floor( trg_len.float() * self.msg_len_ratio ).long()
-            seq_lens = torch.max(torch.min( seq_lens, en_ref_len ),
-                                 seq_lens.new(seq_lens.size()).fill_(self.min_len_gen) )
+            en_ref_len = torch.floor(trg_len.float() * self.msg_len_ratio).long()
+            seq_lens = torch.min(seq_lens, en_ref_len)
+
+        # Make length larger than min len
+        seq_lens = torch.max(seq_lens, seq_lens.new(seq_lens.size()).fill_(self.min_len_gen))
 
         # Make sure message is valid
         ends_with_eos = (msg.gather(dim=1, index=(seq_lens-1)[:, None]).view(-1) == eos_tensor).long()
-        # (eos_token if eos, pad_token if otherwise)
         eos_or_pad = ends_with_eos * self.pad_token + (1 - ends_with_eos) * self.eos_token
-        msg = torch.cat([msg, msg.new(batch_size, 1).fill_(0)], dim=1)
+        msg = torch.cat([msg, msg.new(batch_size, 1).fill_(self.pad_token)], dim=1)
         if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
-            zero_gumbel_tokens = cuda(torch.zeros(msg.shape[0], 1, self.gumbel_tokens.shape[2]))
-            zero_gumbel_tokens[:, :, 0] = 1
-            self.gumbel_tokens = torch.cat([self.gumbel_tokens, zero_gumbel_tokens], dim=1)
+            pad_gumbel_tokens = cuda(torch.zeros(msg.shape[0], 1, self.gumbel_tokens.shape[2]))
+            pad_gumbel_tokens[:, :, self.pad_token] = 1
+            self.gumbel_tokens = torch.cat([self.gumbel_tokens, pad_gumbel_tokens], dim=1)
 
         # (batch_size, y_seq_len + 1)
         msg.scatter_(dim=1, index=seq_lens[:,None], src=eos_or_pad[:,None])
@@ -240,15 +241,7 @@ class RNNDecAttn(ArgsModule):
         msg_mask = xlen_to_inv_mask(seq_lens, seq_len=msg.size(1)) # (batch_size, x_seq_len)
         msg.masked_fill_(msg_mask.bool(), self.pad_token)
         result.update({"msg": msg, "new_seq_lens": seq_lens})
-        if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
-            batch_ids, len_ids = torch.where(msg_mask.bool())
-            zeros = cuda(torch.zeros_like(batch_ids).long())
-            self.gumbel_tokens[batch_ids, len_ids] = 0
-            self.gumbel_tokens[batch_ids, len_ids, zeros] = 1
         return result
-        # msg : EN message
-        # seq_lens : action seq_len (uttered by the decoder, may not include <EOS>)
-        # new_seq_lens : seq_len seen by the next model (including <EOS>)
 
     def beam(self, src_hid, src_len):
         # src_hid : (batch_size, x_seq_len, D_hid * n_dir)

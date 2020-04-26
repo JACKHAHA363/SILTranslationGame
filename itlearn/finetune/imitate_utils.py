@@ -97,7 +97,8 @@ def _en_de_imitate_loss(args, train_it, student, teacher):
             raise ValueError
         en_msg, en_msg_len = _make_sure_message_valid(en_msg, en_msg_len, teacher.init_token)
         en_hid = teacher.en_de.enc(en_msg, en_msg_len)
-        de_send_results = teacher.en_de.dec.send(en_hid, en_msg_len, batch.de[1] - 1, 'argmax')
+        de_send_results = teacher.en_de.dec.send(src_hid=en_hid, src_len=en_msg_len, trg_len=batch.de[1] - 1,
+                                                 send_method='argmax')
         de_msg, de_msg_len = [de_send_results[key] for key in ["msg", "new_seq_lens"]]
         de_msg, de_msg_len = _make_sure_message_valid(de_msg, de_msg_len, teacher.init_token)
 

@@ -24,6 +24,10 @@ class BaseAgents(ArgsModule):
             nn.Linear(args.D_hid, 1)
         )
 
+        args.logger.info('Trim Dots!')
+        self.dot_token = args.EN.vocab.stoi['.'] \
+            if hasattr(args, 'trim_dots') and args.trim_dots else None
+
     def fr_en_speak(self, batch, is_training=False):
         """ Different way for fr en speak """
         raise NotImplementedError
@@ -34,10 +38,13 @@ class BaseAgents(ArgsModule):
         (en, en_len) = batch.en
         (de, de_len) = batch.de
         fr_hid = self.fr_en.enc(fr[:, 1:], fr_len - 1)
-        en_send_results = self.fr_en.dec.send(fr_hid, fr_len - 1, en_len - 1, 'argmax')
+        en_send_results = self.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len - 1,
+                                              trg_len=en_len - 1, send_method='argmax',
+                                              dot_token=self.dot_token)
         en_msg, en_msg_len = [en_send_results[key] for key in ["msg", "new_seq_lens"]]
         en_hid = self.en_de.enc(en_msg, en_msg_len)
-        de_send_results = self.en_de.dec.send(en_hid, en_msg_len, de_len - 1, 'argmax')
+        de_send_results = self.en_de.dec.send(src_hid=en_hid, src_len=en_msg_len,
+                                              trg_len=de_len - 1, send_method='argmax')
         de_msg, de_msg_len = [de_send_results[key] for key in ["msg", "new_seq_lens"]]
         return en_msg, de_msg, en_msg_len, de_msg_len
 
@@ -78,9 +85,14 @@ class AgentsA2C(BaseAgents):
         (en, en_len) = batch.en
         fr_hid = self.fr_en.enc(fr[:, 1:], fr_len - 1)
         if is_training:
-            send_results = self.fr_en.dec.send(fr_hid, fr_len - 1, en_len - 1, "reinforce", self.value_fn)
+            send_results = self.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len - 1,
+                                               trg_len=en_len - 1, send_method="reinforce",
+                                               value_fn=self.value_fn,
+                                               dot_token=self.dot_token)
         else:
-            send_results = self.fr_en.dec.send(fr_hid, fr_len - 1, en_len - 1, 'argmax')
+            send_results = self.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len - 1,
+                                               trg_len=en_len - 1, send_method='argmax',
+                                               dot_token=self.dot_token)
         en_msg, en_msg_len = [send_results[key] for key in ["msg", "new_seq_lens"]]
         return en_msg, en_msg_len
 
@@ -146,10 +158,14 @@ class AgentsGumbel(BaseAgents):
         (_, en_len) = batch.en
         fr_hid = self.fr_en.enc(fr[:, 1:], fr_len - 1)
         if is_training:
-            send_results = self.fr_en.dec.send(fr_hid, fr_len - 1, en_len - 1, "gumbel",
-                                               None, self.gumbel_temp)
+            send_results = self.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len - 1,
+                                               trg_len=en_len - 1, send_method="gumbel",
+                                               gumbel_temp=self.gumbel_temp,
+                                               dot_token=self.dot_token)
         else:
-            send_results = self.fr_en.dec.send(fr_hid, fr_len - 1, en_len - 1, 'argmax')
+            send_results = self.fr_en.dec.send(src_hid=fr_hid, src_len=fr_len - 1,
+                                               trg_len=en_len - 1, send_method='argmax',
+                                               dot_token=self.dot_token)
         en_msg, en_msg_len = [send_results[key] for key in ["msg", "new_seq_lens"]]
         return en_msg, en_msg_len
 

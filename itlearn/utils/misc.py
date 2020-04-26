@@ -223,3 +223,19 @@ def get_logger(args):
         fh.setFormatter(formatter)
         logger.addHandler(fh)
     return logger
+
+def first_appear_indice(tensor, ele):
+    """ Return the indices of the tensor that first appear "ele".
+    If ele does not appear, return maximum len
+    :param tensor: S1 x S2 x ... x S_{n}
+    :param ele: number
+    :return: S1 x S2 x ... x S_{n-1}
+    """
+    max_len = tensor.shape[-1]
+    flat_tensor = tensor.reshape([-1, max_len])
+    first_indice = tensor.new(flat_tensor.shape[0]).fill_(-1)
+    ele_tensor = tensor.new(1).fill_(ele)
+    for row_id, row in enumerate(flat_tensor):
+        is_ele = (torch.cat([row, ele_tensor], -1) == ele)
+        first_indice[row_id] = is_ele.nonzero().min()
+    return first_indice.reshape(tensor.shape[:-1])
