@@ -14,6 +14,32 @@ from utils.misc import cuda
 UNK = '<unk>'
 BOS = '<bos>'
 EOS = '<eos>'
+PAD = '<pad>'
+
+
+def trim_batch(batch, ratio):
+    if hasattr(batch, "fr"):
+        total_size = batch.fr[0].shape[0]
+        split = int(ratio * total_size) + 1
+        batch.fr[0] = batch.fr[0][:split]
+        batch.fr[1] = batch.fr[1][:split]
+
+        batch.en[0] = batch.en[0][:split]
+        batch.en[1] = batch.en[1][:split]
+
+        batch.de[0] = batch.de[0][:split]
+        batch.de[1] = batch.de[1][:split]
+    elif hasattr(batch, "src"):
+        total_size = batch.src[0].shape
+        split = int(ratio * total_size) + 1
+        batch.src[0] = batch.src[0][:split]
+        batch.src[1] = batch.src[1][:split]
+
+        batch.trg[0] = batch.trg[0][:split]
+        batch.trg[1] = batch.trg[1][:split]
+    else:
+        raise Exception
+    return batch
 
 
 def dyn_batch_without_padding(new, i, sofar):
@@ -336,6 +362,3 @@ class LanguageModelingDataset(data.Dataset):
 
         super(LanguageModelingDataset, self).__init__(
             examples, fields, **kwargs)
-
-
-PAD = '<pad>'
