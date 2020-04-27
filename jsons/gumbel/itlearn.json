@@ -58,7 +58,6 @@
     "save_imitate_stats": false,
     "same_opt": true,
     "en_de_finetune": true,
-    "sil_s2p_mode": "prob",
     "sil_s2p_ratio": 0,
     "fr_en_reset": true,
     "k1": 4000,
