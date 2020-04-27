@@ -209,7 +209,6 @@ class RNNDecAttn(ArgsModule):
 
         # Trim sequence length with first dot tensor
         if dot_token is not None:
-            import ipdb; ipdb.set_trace()
             seq_lens = first_appear_indice(msg, dot_token) + 1
             pass
 
