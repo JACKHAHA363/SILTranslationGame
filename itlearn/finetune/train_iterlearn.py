@@ -1,4 +1,5 @@
 import math
+import time
 
 import numpy as np
 import torch
@@ -154,11 +155,15 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
             stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
             if not args.fr_en_reset:
                 student.fr_en.load_state_dict(model.fr_en.state_dict())
+            start = time.time()
             fr_en_statss = imitate_fr_en(args, student=student,
                                          teacher=model, train_it=train_it,
                                          dev_it=dev_it, monitor_names=monitor_names,
                                          extra_input=extra_input, opt=stu_fr_en_opt)
+            end = time.time() - start
+            args.logger.info('FrEn cost time: {:.2f}'.format(end - start))
 
+            start = time.time()
             if not args.en_de_finetune:
                 en_de_statss = imitate_en_de(args, student=student,
                                              teacher=model, train_it=train_it, dev_it=dev_it,
@@ -167,6 +172,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                 en_de_statss = finetune_en_de(args, student=student,
                                               teacher=model, train_it=train_it, dev_it=dev_it,
                                               opt=stu_en_de_opt, extra_input=extra_input)
+            end = time.time()
+            args.logger.info('EnDe cost time: {:.2f}'.format(end - start))
 
             # Report change of student and teacher
             teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
