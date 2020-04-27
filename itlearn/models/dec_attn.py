@@ -217,8 +217,9 @@ class RNNDecAttn(ArgsModule):
             en_ref_len = torch.floor(trg_len.float() * self.msg_len_ratio).long()
             seq_lens = torch.min(seq_lens, en_ref_len)
 
-        # Make length larger than min len
+        # Make length larger than min len and valid
         seq_lens = torch.max(seq_lens, seq_lens.new(seq_lens.size()).fill_(self.min_len_gen))
+        seq_lens = torch.min(seq_lens, seq_lens.new(seq_lens.size()).fill_(msg.shape[1]))
 
         # Make sure message is valid
         ends_with_eos = (msg.gather(dim=1, index=(seq_lens-1)[:, None]).view(-1) == eos_tensor).long()
