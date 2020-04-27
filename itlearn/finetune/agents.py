@@ -24,9 +24,11 @@ class BaseAgents(ArgsModule):
             nn.Linear(args.D_hid, 1)
         )
 
-        args.logger.info('Trim Dots!')
-        self.dot_token = args.EN.vocab.stoi['.'] \
-            if hasattr(args, 'trim_dots') and args.trim_dots else None
+        if hasattr(args, 'trim_dots') and args.trim_dots:
+            args.logger.info('Trim Dots!')
+            self.dot_token = args.EN.vocab.stoi['.']
+        else:
+            self.dot_token = None
 
     def fr_en_speak(self, batch, is_training=False):
         """ Different way for fr en speak """
