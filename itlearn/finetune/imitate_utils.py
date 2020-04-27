@@ -207,7 +207,7 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
 
 def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
     """ Perform finetuning """
-    args.logger.info('Fr En: Finetune: {}% S2P: {}%'.format((1 - args.sil_s2p_ratio)*100, args.sil_s2p_ratio*100))
+    args.logger.info('En De: Finetune: {}% S2P: {}%'.format((1 - args.sil_s2p_ratio)*100, args.sil_s2p_ratio*100))
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     iters = 0

@@ -160,7 +160,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                                          teacher=model, train_it=train_it,
                                          dev_it=dev_it, monitor_names=monitor_names,
                                          extra_input=extra_input, opt=stu_fr_en_opt)
-            end = time.time() - start
+            end = time.time()
             args.logger.info('FrEn cost time: {:.2f}'.format(end - start))
 
             start = time.time()
