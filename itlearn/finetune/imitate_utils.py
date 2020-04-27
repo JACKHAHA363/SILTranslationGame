@@ -6,6 +6,7 @@ from itlearn.finetune.agents_utils import eval_fr_en_stats
 from itlearn.utils.metrics import Metrics
 from itlearn.utils.bleu import computeBLEU
 from itlearn.utils.misc import cuda
+from itlearn.utils.data import trim_batch
 
 __all__ = ['imitate_fr_en', 'imitate_en_de', 'finetune_en_de',
            'get_fr_en_imitate_stats', 'get_en_de_imitate_stats']
@@ -49,14 +50,16 @@ def _get_imitate_loss(distill_temp, student_model, teacher_model, src, src_len, 
     return loss
 
 
-def _s2p_loss_real(args, model, iwslt_it, multi30k_it, src_name, trg_name):
+def _get_s2p_loss(args, model, iwslt_it, multi30k_it, src_name, trg_name):
     # Use labeled data
     if args.sil_s2p_dataset == 'iwslt':
         batch = iwslt_it.__next__()
+        batch = trim_batch(batch, ratio=args.sil_s2p_ratio)
         src, src_len = batch.src
         trg = batch.trg[0]
     elif args.sil_s2p_dataset == 'multi30k':
         batch = multi30k_it.__next__()
+        batch = trim_batch(batch, ratio=args.sil_s2p_ratio)
         (src, src_len) = getattr(batch, src_name)
         (trg, _) = getattr(batch, trg_name)
     else:
@@ -70,6 +73,7 @@ def _s2p_loss_real(args, model, iwslt_it, multi30k_it, src_name, trg_name):
 
 def _fr_en_imitate_loss(args, train_it, student, teacher):
     batch = train_it.__next__()
+    batch = trim_batch(batch, 1 - args.sil_s2p_ratio)
     with torch.no_grad():
         teacher.eval()
         if args.send_method == 'argmax':
@@ -86,6 +90,7 @@ def _fr_en_imitate_loss(args, train_it, student, teacher):
 
 def _en_de_imitate_loss(args, train_it, student, teacher):
     batch = train_it.__next__()
+    batch = trim_batch(batch, 1 - args.sil_s2p_ratio)
     # Teacher generate message
     with torch.no_grad():
         teacher.eval()
@@ -110,6 +115,7 @@ def _en_de_imitate_loss(args, train_it, student, teacher):
 def _en_de_finetune_loss(args, train_it, student, teacher):
     # Teacher generate message
     batch = train_it.__next__()
+    batch = trim_batch(batch, 1 - args.sil_s2p_ratio)
     with torch.no_grad():
         teacher.eval()
         if args.send_method == 'argmax':
@@ -127,9 +133,7 @@ def _en_de_finetune_loss(args, train_it, student, teacher):
 
 def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra_input, opt):
     """ Imitate speake """
-    args.logger.info('Fr En: Imitate: {}% S2P: {}% mode: {}'.format((1 - args.sil_s2p_ratio)*100,
-                                                                    args.sil_s2p_ratio*100,
-                                                                    args.sil_s2p_mode))
+    args.logger.info('Fr En: Imitate: {}% S2P: {}%'.format((1 - args.sil_s2p_ratio)*100, args.sil_s2p_ratio*100))
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
@@ -147,21 +151,10 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
             imitate_statss.append((iters, stats))
 
         # This mode of S2P will use probability to do separate update
-        if args.sil_s2p_mode == 'prob':
-            if random.random() < args.sil_s2p_ratio:
-                loss = _s2p_loss_real(args, student.fr_en, s2p_fr_en_it, train_it,
-                                      src_name='fr', trg_name='en')
-            else:
-                # Imitate
-                loss = _fr_en_imitate_loss(args, train_it, student, teacher)
-
-        elif args.sil_s2p_mode == 'interp':
-            s2p_loss = _s2p_loss_real(args, student.fr_en, s2p_fr_en_it, train_it,
-                                      src_name='fr', trg_name='en')
-            sil_loss = _fr_en_imitate_loss(args, train_it, student, teacher)
-            loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
-        else:
-            raise ValueError
+        s2p_loss = _get_s2p_loss(args, student.fr_en, s2p_fr_en_it, train_it,
+                                 src_name='fr', trg_name='en')
+        sil_loss = _fr_en_imitate_loss(args, train_it, student, teacher)
+        loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
 
         # opt step
         opt.zero_grad()
@@ -178,9 +171,7 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
 
 
 def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
-    args.logger.info('En De: Imitate: {}% S2P: {}% mode: {}'.format((1 - args.sil_s2p_ratio)*100,
-                                                                    args.sil_s2p_ratio*100,
-                                                                    args.sil_s2p_mode))
+    args.logger.info('En De: Imitate: {}% S2P: {}%'.format((1 - args.sil_s2p_ratio)*100, args.sil_s2p_ratio*100))
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     iters = 0
@@ -197,23 +188,10 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
             stats = get_en_de_imitate_stats(args, student, dev_it)
             imitate_statss.append((iters, stats))
 
-        if args.sil_s2p_mode == 'prob':
-            if random.random() < args.sil_s2p_ratio:
-                # Use labeled data
-                loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
-                                      src_name='en', trg_name='de')
-            else:
-                # Imitate
-                loss = _en_de_imitate_loss(args, train_it, student, teacher)
-
-        elif args.sil_s2p_mode == 'interp':
-            s2p_loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
-                                      src_name='en', trg_name='de')
-            sil_loss = _en_de_imitate_loss(args, train_it, student, teacher)
-            loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
-        else:
-            raise ValueError
-
+        s2p_loss = _get_s2p_loss(args, student.en_de, s2p_en_de_it, train_it,
+                                 src_name='en', trg_name='de')
+        sil_loss = _en_de_imitate_loss(args, train_it, student, teacher)
+        loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -229,9 +207,7 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
 
 def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
     """ Perform finetuning """
-    args.logger.info('Fr En: Finetune: {}% S2P: {}% mode: {}'.format((1 - args.sil_s2p_ratio)*100,
-                                                                     args.sil_s2p_ratio*100,
-                                                                     args.sil_s2p_mode))
+    args.logger.info('En De: Finetune: {}% S2P: {}%'.format((1 - args.sil_s2p_ratio)*100, args.sil_s2p_ratio*100))
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     iters = 0
@@ -248,23 +224,10 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
             stats = get_en_de_imitate_stats(args, student, dev_it)
             imitate_statss.append((iters, stats))
 
-        if args.sil_s2p_mode == 'prob':
-            if random.random() < args.sil_s2p_ratio:
-                # Use labeled data
-                loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
-                                      src_name='en', trg_name='de')
-            else:
-                # Imitate
-                loss = _en_de_finetune_loss(args, train_it, student, teacher)
-
-        elif args.sil_s2p_mode == 'interp':
-            s2p_loss = _s2p_loss_real(args, student.en_de, s2p_en_de_it, train_it,
-                                      src_name='en', trg_name='de')
-            sil_loss = _en_de_finetune_loss(args, train_it, student, teacher)
-            loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
-        else:
-            raise ValueError
-
+        s2p_loss = _get_s2p_loss(args, student.en_de, s2p_en_de_it, train_it,
+                                 src_name='en', trg_name='de')
+        sil_loss = _en_de_finetune_loss(args, train_it, student, teacher)
+        loss = args.sil_s2p_ratio * s2p_loss + (1 - args.sil_s2p_ratio) * sil_loss
         opt.zero_grad()
         loss.backward()
         opt.step()

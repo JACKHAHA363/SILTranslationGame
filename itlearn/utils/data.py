@@ -3,6 +3,7 @@ import os
 import pickle as pickle
 from collections import Counter, OrderedDict
 from contextlib import ExitStack
+from torchtext.data import Batch
 
 import six
 import torch
@@ -14,6 +15,22 @@ from utils.misc import cuda
 UNK = '<unk>'
 BOS = '<bos>'
 EOS = '<eos>'
+PAD = '<pad>'
+
+
+def trim_batch(batch, ratio):
+    if hasattr(batch, "fr"):
+        total_size = batch.fr[0].shape[0]
+        split = int(ratio * total_size) + 1
+    elif hasattr(batch, "src"):
+        total_size = batch.src[0].shape[0]
+        split = int(ratio * total_size) + 1
+    else:
+        raise Exception
+    for name in batch.fields:
+        new_tuple = tuple([val[:split] for val in getattr(batch, name)])
+        setattr(batch, name, new_tuple)
+    return batch
 
 
 def dyn_batch_without_padding(new, i, sofar):
@@ -336,6 +353,3 @@ class LanguageModelingDataset(data.Dataset):
 
         super(LanguageModelingDataset, self).__init__(
             examples, fields, **kwargs)
-
-
-PAD = '<pad>'
