@@ -29,11 +29,11 @@ from math import ceil
 import math
 
 # The Tags that I care about
-#TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
-#NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
+TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
+NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
 
-TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
-NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
+#TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
+#NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
 # Plot Config
 NB_COL = 2
 NB_ROW = ceil(len(TAGS) / NB_COL)
@@ -143,7 +143,7 @@ def main():
     parser.add_argument('-use_median', action='store_true')
     args = parser.parse_args()
 
-    exp_names = os.listdir(args.exp_dir)
+    exp_names = sorted(os.listdir(args.exp_dir))
     print('We have {} experiments'.format(len(exp_names)))
 
     all_data = {}
@@ -192,8 +192,9 @@ def main():
             plt.xticks(fontsize=20)
             plt.yticks(fontsize=20)
             plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=20)
-            fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])))
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=20, use_median=args.use_median)
+            fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])),
+                        bbox_inches='tight')
 
 
 if __name__ == '__main__':
