@@ -143,7 +143,8 @@ def main():
     parser.add_argument('-use_median', action='store_true')
     args = parser.parse_args()
 
-    exp_names = sorted(os.listdir(args.exp_dir))
+    exp_names = [exp_name for exp_name in sorted(os.listdir(args.exp_dir)) if
+                 os.path.isdir(os.path.join(args.exp_dir, exp_name))]
     print('We have {} experiments'.format(len(exp_names)))
 
     all_data = {}
@@ -184,7 +185,10 @@ def main():
         for tag, ax in zip(all_tags, axs.reshape([-1])):
             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
             plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10, use_median=args.use_median)
-        fig.savefig(os.path.join(args.output_dir, 'result.png'))
+        if args.use_median:
+            fig.savefig(os.path.join(args.output_dir, 'result_median.png'))
+        else:
+            fig.savefig(os.path.join(args.output_dir, 'result_mean.png'))
     else:
         matplotlib.rc('font', size=20)
         for tag in all_tags:
