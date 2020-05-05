@@ -76,6 +76,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     decoding_path.mkdir(parents=True, exist_ok=True)
     from tensorboardX import SummaryWriter
     writer = SummaryWriter( args.event_path + args.id_str)
+    resume = 'resume' in extra_input
 
     # Opt
     params = [p for p in model.parameters() if p.requires_grad]
@@ -83,6 +84,8 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         opt = torch.optim.Adam(params, betas=(0.9, 0.98), eps=1e-9, lr=args.lr)
     else:
         raise NotImplementedError
+    if resume:
+        opt.load_state_dict(extra_input['resume']['opt'])
 
     train_metrics = Metrics('train_loss', *loss_names, *monitor_names, data_type="avg")
     best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=model, opt=opt, path=args.model_path + args.id_str,
@@ -93,10 +96,19 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
         student = AgentsGumbel(args)
     else:
         student = AgentsA2C(args)
-    student.load_state_dict(model.state_dict())
+    if resume:
+        student.load_state_dict(model.state_dict())
+    else:
+        student.load_state_dict(extra_input['resume']['student'])
     if torch.cuda.device_count() > 0 and args.gpu > -1:
         student.cuda(args.gpu)
-    stu_fr_en_opt, stu_en_de_opt = None, None
+
+    if resume:
+        stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student)
+        stu_fr_en_opt.load_state_dict(extra_input['resume']['stu_fr_en_opt'])
+        stu_en_de_opt.load_state_dict(extra_input['resume']['stu_en_de_opt'])
+    else:
+        stu_fr_en_opt, stu_en_de_opt = None, None
 
     # S2P
     s2p_fr_en_it, s2p_en_de_it = None, None
@@ -108,103 +120,119 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
 
     # Determine when to stop iterlearn
     max_itlearn_steps = args.max_itlearn_steps if args.max_itlearn_steps > 0 else args.max_training_steps
-    for iters, train_batch in enumerate(train_it):
-        if iters >= args.max_training_steps:
-            args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
-            break
+    iters = extra_input['resume']['iters'] if resume else 0
+    try:
+        train_it = iter(train_it)
+        while iters < args.max_training_steps:
+            train_batch = train_it.__next__()
+            if iters >= args.max_training_steps:
+                args.logger.info('stopping training after {} training steps'.format(args.max_training_steps))
+                break
 
-        if not args.debug and hasattr(args, 'save_every') and iters % args.save_every == 0:
-            args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
-            with torch.cuda.device(args.gpu):
-                torch.save(model.state_dict(), '{}_iter={}.pt'.format(args.model_path + args.id_str, iters))
-                torch.save([iters, opt.state_dict()],
-                           '{}_iter={}.pt.states'.format(args.model_path + args.id_str, iters))
+            if not args.debug and hasattr(args, 'save_every') and iters % args.save_every == 0:
+                args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
+                with torch.cuda.device(args.gpu):
+                    torch.save(model.state_dict(), '{}_iter={}.pt'.format(args.model_path + args.id_str, iters))
+                    torch.save([iters, opt.state_dict()],
+                               '{}_iter={}.pt.states'.format(args.model_path + args.id_str, iters))
 
-        if iters % args.eval_every == 0:
-            dev_metrics = valid_model(model, dev_it, loss_names, monitor_names, extra_input)
-            eval_metric, bleu_en, bleu_de = eval_model(args, model, dev_it, monitor_names, iters, extra_input)
-            if not args.debug:
-                write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names],
-                         iters, prefix="dev/")
-                write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names],
-                         iters, prefix="dev/")
+            if iters % args.eval_every == 0:
+                dev_metrics = valid_model(model, dev_it, loss_names, monitor_names, extra_input)
+                eval_metric, bleu_en, bleu_de = eval_model(args, model, dev_it, monitor_names, iters, extra_input)
+                if not args.debug:
+                    write_tb(writer, loss_names, [dev_metrics.__getattr__(name) for name in loss_names],
+                             iters, prefix="dev/")
+                    write_tb(writer, monitor_names, [dev_metrics.__getattr__(name) for name in monitor_names],
+                             iters, prefix="dev/")
 
-                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
-                         prefix="bleu_en/")
-                write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
-                         prefix="bleu_de/")
-                write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
-                write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
-                         iters, prefix="eval/")
+                    write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
+                             prefix="bleu_en/")
+                    write_tb(writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
+                             prefix="bleu_de/")
+                    write_tb(writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
+                    write_tb(writer, monitor_names, [eval_metric.__getattr__(name) for name in monitor_names],
+                             iters, prefix="eval/")
 
-            args.logger.info('model:' + args.prefix + args.hp_str)
-            best.accumulate(bleu_de[0], bleu_en[0], iters)
-            args.logger.info(best)
+                args.logger.info('model:' + args.prefix + args.hp_str)
+                best.accumulate(bleu_de[0], bleu_en[0], iters)
+                args.logger.info(best)
 
-        model.train()
-        selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
-                      train_metrics, writer, s2p_fr_en_it=s2p_fr_en_it,
-                      s2p_en_de_it=s2p_en_de_it)
+            model.train()
+            selfplay_step(args, extra_input, iters, loss_cos, loss_names, model, monitor_names, opt, params, train_batch,
+                          train_metrics, writer, s2p_fr_en_it=s2p_fr_en_it,
+                          s2p_en_de_it=s2p_en_de_it)
 
-        if (iters + 1) % args.k1 == 0 and (iters + 1) < max_itlearn_steps:
-            args.logger.info('start imitating at iters {}'.format(iters + 1))
-            student.train()
-            old_student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
-            old_student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
-            model.eval()
-            stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
-            if not args.fr_en_reset:
-                student.fr_en.load_state_dict(model.fr_en.state_dict())
-            start = time.time()
-            fr_en_statss = imitate_fr_en(args, student=student,
-                                         teacher=model, train_it=train_it,
-                                         dev_it=dev_it, monitor_names=monitor_names,
-                                         extra_input=extra_input, opt=stu_fr_en_opt)
-            end = time.time()
-            args.logger.info('FrEn cost time: {:.2f}'.format(end - start))
+            if (iters + 1) % args.k1 == 0 and (iters + 1) < max_itlearn_steps:
+                args.logger.info('start imitating at iters {}'.format(iters + 1))
+                student.train()
+                old_student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
+                old_student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
+                model.eval()
+                stu_fr_en_opt, stu_en_de_opt = get_student_opts(args, student, (stu_fr_en_opt, stu_en_de_opt))
+                if not args.fr_en_reset:
+                    student.fr_en.load_state_dict(model.fr_en.state_dict())
+                start = time.time()
+                fr_en_statss = imitate_fr_en(args, student=student,
+                                             teacher=model, train_it=train_it,
+                                             dev_it=dev_it, monitor_names=monitor_names,
+                                             extra_input=extra_input, opt=stu_fr_en_opt)
+                end = time.time()
+                args.logger.info('FrEn cost time: {:.2f}'.format(end - start))
 
-            start = time.time()
-            if not args.en_de_finetune:
-                en_de_statss = imitate_en_de(args, student=student,
-                                             teacher=model, train_it=train_it, dev_it=dev_it,
-                                             opt=stu_en_de_opt, extra_input=extra_input)
-            else:
-                en_de_statss = finetune_en_de(args, student=student,
-                                              teacher=model, train_it=train_it, dev_it=dev_it,
-                                              opt=stu_en_de_opt, extra_input=extra_input)
-            end = time.time()
-            args.logger.info('EnDe cost time: {:.2f}'.format(end - start))
+                start = time.time()
+                if not args.en_de_finetune:
+                    en_de_statss = imitate_en_de(args, student=student,
+                                                 teacher=model, train_it=train_it, dev_it=dev_it,
+                                                 opt=stu_en_de_opt, extra_input=extra_input)
+                else:
+                    en_de_statss = finetune_en_de(args, student=student,
+                                                  teacher=model, train_it=train_it, dev_it=dev_it,
+                                                  opt=stu_en_de_opt, extra_input=extra_input)
+                end = time.time()
+                args.logger.info('EnDe cost time: {:.2f}'.format(end - start))
 
-            # Report change of student and teacher
-            teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
-            student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
-            teacher_en_de_stats = get_en_de_imitate_stats(args, model, dev_it)
-            student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
-            df = DataFrame(columns=['teacher', 'stu', 'old_stu'])
-            for name in student_fr_en_stats:
-                df.loc[name, 'stu'] = student_fr_en_stats[name]
-                df.loc[name, 'teacher'] = teacher_fr_en_stats[name]
-                df.loc[name, 'old_stu'] = old_student_fr_en_stats[name]
-            for name in student_en_de_stats:
-                df.loc[name, 'stu'] = student_en_de_stats[name]
-                df.loc[name, 'teacher'] = teacher_en_de_stats[name]
-                df.loc[name, 'old_stu'] = old_student_en_de_stats[name]
-            args.logger.info(str(df))
+                # Report change of student and teacher
+                teacher_fr_en_stats = get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input)
+                student_fr_en_stats = get_fr_en_imitate_stats(args, student, dev_it, monitor_names, extra_input)
+                teacher_en_de_stats = get_en_de_imitate_stats(args, model, dev_it)
+                student_en_de_stats = get_en_de_imitate_stats(args, student, dev_it)
+                df = DataFrame(columns=['teacher', 'stu', 'old_stu'])
+                for name in student_fr_en_stats:
+                    df.loc[name, 'stu'] = student_fr_en_stats[name]
+                    df.loc[name, 'teacher'] = teacher_fr_en_stats[name]
+                    df.loc[name, 'old_stu'] = old_student_fr_en_stats[name]
+                for name in student_en_de_stats:
+                    df.loc[name, 'stu'] = student_en_de_stats[name]
+                    df.loc[name, 'teacher'] = teacher_en_de_stats[name]
+                    df.loc[name, 'old_stu'] = old_student_en_de_stats[name]
+                args.logger.info(str(df))
 
-            if args.save_imitate_stats:
-                print('Save imitation stats')
-                if not os.path.exists(os.path.join(args.misc_path, args.id_str)):
-                    os.makedirs(os.path.join(args.misc_path, args.id_str))
-                fr_en_fig = plot_imitate_stats(teacher_fr_en_stats, fr_en_statss)
-                fr_en_fig.savefig(os.path.join(args.misc_path, args.id_str, 'fr_en_{}_stats.png'.format(iters + 1)))
-                del fr_en_fig
-                en_de_fig = plot_imitate_stats(teacher_en_de_stats, en_de_statss)
-                en_de_fig.savefig(os.path.join(args.misc_path, args.id_str, 'en_de_{}_stats.png'.format(iters + 1)))
-                del en_de_fig
+                if args.save_imitate_stats:
+                    print('Save imitation stats')
+                    if not os.path.exists(os.path.join(args.misc_path, args.id_str)):
+                        os.makedirs(os.path.join(args.misc_path, args.id_str))
+                    fr_en_fig = plot_imitate_stats(teacher_fr_en_stats, fr_en_statss)
+                    fr_en_fig.savefig(os.path.join(args.misc_path, args.id_str, 'fr_en_{}_stats.png'.format(iters + 1)))
+                    del fr_en_fig
+                    en_de_fig = plot_imitate_stats(teacher_en_de_stats, en_de_statss)
+                    en_de_fig.savefig(os.path.join(args.misc_path, args.id_str, 'en_de_{}_stats.png'.format(iters + 1)))
+                    del en_de_fig
 
-            # Update teacher with finalized student
-            model.load_state_dict(student.state_dict())
+                # Update teacher with finalized student
+                model.load_state_dict(student.state_dict())
 
+            iters += 1
+    except InterruptedError:
+        # End Gracefully
+        args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
+        with torch.cuda.device(args.gpu):
+            status = {'iters': iters,
+                      'model': model.state_dict(),
+                      'student': student.state_dict(),
+                      'opt': opt.state_dict(),
+                      'stu_fr_en_opt': stu_fr_en_opt.state_dict(),
+                      'stu_en_de_opt': stu_en_de_opt.state_dict(), }
+            torch.save(status, '{}_latest.pt'.format(args.model_path + args.id_str))
 
 def plot_imitate_stats(teacher_stats, imitate_statss):
     iterss = [res[0] for res in imitate_statss]

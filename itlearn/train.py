@@ -48,9 +48,10 @@ for name in folders:
     if not args.debug:
         Path(args.__dict__["{}_path".format(name)]).mkdir(parents=True, exist_ok=True)
 
-args.prefix = strftime("%m.%d_%H.%M.", localtime())
-args.hp_str = get_hp_str(args)
-args.id_str = args.prefix + "_" + args.hp_str
+if not hasattr(args, 'hp_str'):
+    args.hp_str = get_hp_str(args)
+    args.prefix = strftime("%m.%d_%H.%M.", localtime())
+    args.id_str = args.prefix + "_" + args.hp_str
 logger = get_logger(args)
 set_seed(args)
 
@@ -66,17 +67,21 @@ args.logger.info('Starting with HPARAMS: {}'.format(args.hp_str))
 
 # Model
 model = get_model(args)
-
+extra_input = {}
 if args.gpu > -1 and torch.cuda.device_count() > 0:
     map_location = lambda storage, loc: storage.cuda()
 else:
     map_location = lambda storage, loc: storage
 
-model_path = join(main_path, 'model/{}/{}_best.pt')
+resume_path = os.path.join(args.model_path, args.id_str + '_latest.pt')
+if os.path.exists(resume_path):
+    extra_input['resume'] = torch.load(resume_path, map_location)
+    args.logger.info('Resume training from iter={}'.format(extra_input['resume']['iters']))
+    model.load_state_dict(extra_input['resume']['model'])
 
 
 # Loading EN LM
-extra_input = {"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None, "s2p_it": None}
+extra_input.update({"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None, "s2p_it": None})
 if args.setup in JOINT_SETUPS and args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
@@ -132,13 +137,6 @@ if args.setup in JOINT_SETUPS and hasattr(model, 'fr_en') and hasattr(model, 'en
             for param in list(model.fr_en.parameters()):
                 param.requires_grad = False
             args.logger.info("Fixed FR->EN agent")
-
-
-# Resume from checkpoint
-if hasattr(args, 'resume') and args.resume is not None:
-    _, resume_path = get_ckpt_paths(args.exp_dir, args.resume, "best")
-    model.load_state_dict(torch.load(resume_path, map_location))
-    args.logger.info("Loading checkpoint : {}".format(resume_path))
 
 
 args.logger.info(str(model))
