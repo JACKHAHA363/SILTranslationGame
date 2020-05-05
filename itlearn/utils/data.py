@@ -3,14 +3,12 @@ import os
 import pickle as pickle
 from collections import Counter, OrderedDict
 from contextlib import ExitStack
-from torchtext.data import Batch
-
+from itlearn.utils.misc import cuda
 import six
 import torch
 from torchtext import vocab, data
 from torchtext.data import Dataset
 
-from utils.misc import cuda
 
 UNK = '<unk>'
 BOS = '<bos>'

@@ -1,9 +1,7 @@
 import sys
 import torch
 import numpy as np
-
 from time import strftime, localtime
-from os.path import join
 import os
 from pathlib import Path
 
@@ -12,6 +10,9 @@ from utils.misc import set_seed, get_logger
 from models.agent import ImageCaptioning, RNNLM, ImageGrounding
 from utils.hyperparams import Params, get_hp_str
 from data import get_s2p_dataset
+from finetune.agents_utils import train_a2c_model, train_gumbel_model
+from finetune.train_joint import joint_loop
+from finetune.train_iterlearn import itlearn_loop
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -171,23 +172,15 @@ elif args.setup == "lm":
     train_model(args, model, (train_it, dev_it))
 
 elif args.setup == "joint":
-    from finetune.agents_utils import train_a2c_model
-    from finetune.train_joint import joint_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'itlearn':
-    from finetune.agents_utils import train_a2c_model
-    from finetune.train_iterlearn import itlearn_loop
     train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 
 elif args.setup == 'gumbel':
-    from finetune.agents_utils import train_gumbel_model
-    from finetune.train_joint import joint_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
 
 elif args.setup == 'gumbel_itlearn':
-    from finetune.agents_utils import train_gumbel_model
-    from finetune.train_iterlearn import itlearn_loop
     train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
 else:
     raise ValueError

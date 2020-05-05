@@ -97,9 +97,9 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
     else:
         student = AgentsA2C(args)
     if resume:
-        student.load_state_dict(model.state_dict())
-    else:
         student.load_state_dict(extra_input['resume']['student'])
+    else:
+        student.load_state_dict(model.state_dict())
     if torch.cuda.device_count() > 0 and args.gpu > -1:
         student.cuda(args.gpu)
 
