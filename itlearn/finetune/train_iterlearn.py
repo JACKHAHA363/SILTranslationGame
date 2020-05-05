@@ -222,7 +222,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                 model.load_state_dict(student.state_dict())
 
             iters += 1
-    except InterruptedError:
+    except (InterruptedError, KeyboardInterrupt):
         # End Gracefully
         args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
         with torch.cuda.device(args.gpu):
@@ -233,6 +233,7 @@ def itlearn_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_name
                       'stu_fr_en_opt': stu_fr_en_opt.state_dict(),
                       'stu_en_de_opt': stu_en_de_opt.state_dict(), }
             torch.save(status, '{}_latest.pt'.format(args.model_path + args.id_str))
+
 
 def plot_imitate_stats(teacher_stats, imitate_statss):
     iterss = [res[0] for res in imitate_statss]

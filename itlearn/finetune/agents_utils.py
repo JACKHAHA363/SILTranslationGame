@@ -119,6 +119,9 @@ def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
             if len(monitor_names) > 0:
                 eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
 
+            if args.debug:
+                break
+
         bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
         bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
         args.logger.info(eval_metrics)
@@ -145,6 +148,8 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
             losses = [R[key] for key in loss_names]
             dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
                                    *[R[k].item() for k in monitor_names])
+            if model.debug:
+                break
     return dev_metrics
 
 

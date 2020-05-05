@@ -161,11 +161,12 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
         loss.backward()
         opt.step()
         if args.debug and iters % eval_freq == 0:
-            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
-                                   if param.grad is not None])
-            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
-                                   if param.grad is not None])
-            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
+            pass
+            #fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+            #                       if param.grad is not None])
+            #en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+            #                       if param.grad is not None])
+            #print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
         iters += 1
     return imitate_statss
 
@@ -196,11 +197,12 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
         loss.backward()
         opt.step()
         if args.debug and iters % eval_freq == 0:
-            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
-                                   if param.grad is not None])
-            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
-                                   if param.grad is not None])
-            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
+            pass
+            #fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+            #                       if param.grad is not None])
+            #en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+            #                       if param.grad is not None])
+            #print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
         iters += 1
     return imitate_statss
 
@@ -232,11 +234,12 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
         loss.backward()
         opt.step()
         if args.debug and iters % eval_freq == 0:
-            fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
-                                   if param.grad is not None])
-            en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
-                                   if param.grad is not None])
-            print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
+            pass
+            #fr_en_grad_norm = sum([param.grad.norm() for param in student.fr_en.parameters()
+            #                       if param.grad is not None])
+            #en_de_grad_norm = sum([param.grad.norm() for param in student.en_de.parameters()
+            #                       if param.grad is not None])
+            #print('fr_en grad', fr_en_grad_norm, 'en_de grad', en_de_grad_norm)
         iters += 1
     return imitate_statss
 
@@ -261,6 +264,8 @@ def get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input):
                                           ranker=extra_input["ranker"])
             if len(monitor_names) > 0:
                 eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
+            if args.debug:
+                break
 
         bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
         stats = eval_metrics.__dict__['metrics']
@@ -278,6 +283,8 @@ def get_en_de_imitate_stats(args, model, dev_it):
             de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
             _, de_msg, _, de_msg_len = model.decode(dev_batch)
             de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
+            if args.debug:
+                break
         bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
     return {'bleu_de': bleu_de[0]}
 

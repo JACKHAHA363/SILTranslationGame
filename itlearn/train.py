@@ -46,8 +46,7 @@ if 'itlearn' in args.setup:
 for name in folders:
     folder = "{}/{}/".format(name, args.experiment) if hasattr(args, "experiment") else name + '/'
     args.__dict__["{}_path".format(name)] = os.path.join(args.exp_dir, folder)
-    if not args.debug:
-        Path(args.__dict__["{}_path".format(name)]).mkdir(parents=True, exist_ok=True)
+    Path(args.__dict__["{}_path".format(name)]).mkdir(parents=True, exist_ok=True)
 
 if not hasattr(args, 'hp_str'):
     args.hp_str = get_hp_str(args)
