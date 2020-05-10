@@ -25,7 +25,6 @@ import tensorflow as tf
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from math import ceil
 import math
 
 # The Tags that I care about
@@ -36,7 +35,7 @@ NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
 #NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
 # Plot Config
 NB_COL = 2
-NB_ROW = ceil(len(TAGS) / NB_COL)
+NB_ROW = int((len(TAGS) + 1) / NB_COL)
 
 
 class Series:
@@ -181,7 +180,7 @@ def main():
     # Start plotting
     if args.same_canvas:
         matplotlib.rc('font', size=18)
-        fig, axs = plt.subplots(int(len(all_tags)/2) + 1, 2, figsize=(8*(int(len(all_tags)/2) + 1), 20))
+        fig, axs = plt.subplots(NB_ROW, NB_COL, figsize=(13*NB_COL, 10*NB_ROW))
         for tag, ax in zip(all_tags, axs.reshape([-1])):
             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
             plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10, use_median=args.use_median)
