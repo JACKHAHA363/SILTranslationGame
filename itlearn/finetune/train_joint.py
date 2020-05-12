@@ -33,6 +33,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
                 gpu=args.gpu, debug=args.debug)
 
     fr_en_it, en_de_it = None, None
+    s2p_steps = args.__dict__.get('s2p_steps', args.max_training_steps)
     if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
         args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
         fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'], extra_input['s2p_its']['en_de']
@@ -102,7 +103,7 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
 
         train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
         # Add S2P Grad
-        if args.s2p_freq > 0 and iters % args.s2p_freq == 0:
+        if args.s2p_freq > 0 and iters % args.s2p_freq == 0 and iters <= s2p_steps:
             fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
             total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
 

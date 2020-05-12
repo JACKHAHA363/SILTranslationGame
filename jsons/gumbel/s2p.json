@@ -53,5 +53,6 @@
     "debug": false,
     "plot_grad": false,
     "s2p_freq": 1,
-    "s2p_co": 1
+    "s2p_co": 1,
+    "s2p_steps": 140000
 }
