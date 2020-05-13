@@ -19,7 +19,7 @@ def get_s2p_dataset(args):
                                             de_vocab=de_vocab, batch_size=args.batch_size,
                                             device=device, en_vocab=en_vocab,
                                             fr_vocab=fr_vocab, train_repeat=True,
-                                            load_dataset=False, save_dataset=False,
+                                            load_dataset=True, save_dataset=True,
                                             training_max_len=None, small_dataset=small_dataset)
         its[pair] = train_it
     return its
