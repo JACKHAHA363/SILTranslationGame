@@ -89,45 +89,49 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
         if hasattr(args, 'h_co_anneal') and args.h_co_anneal == "linear":
             loss_cos['neg_Hs'] = get_h_co_anneal(iters)
 
-        opt.zero_grad()
+        if args.debug:
+            fr_en_it.__next__()
+            en_de_it.__next__()
+        else:
+            opt.zero_grad()
 
-        batch_size = len(train_batch)
-        R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0],
-                  ranker=extra_input["ranker"])
-        losses = [R[key] for key in loss_names]
+            batch_size = len(train_batch)
+            R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0],
+                      ranker=extra_input["ranker"])
+            losses = [R[key] for key in loss_names]
 
-        total_loss = 0
-        for loss_name, loss in zip(loss_names, losses):
-            assert loss.grad_fn is not None
-            total_loss += loss * loss_cos[loss_name]
+            total_loss = 0
+            for loss_name, loss in zip(loss_names, losses):
+                assert loss.grad_fn is not None
+                total_loss += loss * loss_cos[loss_name]
 
-        train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
-        # Add S2P Grad
-        if args.s2p_freq > 0 and iters % args.s2p_freq == 0 and iters <= s2p_steps:
-            fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
-            total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
+            train_metrics.accumulate(batch_size, *[loss.item() for loss in losses], *[R[k].item() for k in monitor_names])
+            # Add S2P Grad
+            if args.s2p_freq > 0 and iters % args.s2p_freq == 0 and iters <= s2p_steps:
+                fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
+                total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
 
-        total_loss.backward()
-        if args.plot_grad:
-            plot_grad(writer, model, iters)
+            total_loss.backward()
+            if args.plot_grad:
+                plot_grad(writer, model, iters)
 
-        if args.grad_clip > 0:
-            total_norm = nn.utils.clip_grad_norm_(params, args.grad_clip)
-            if total_norm != total_norm or math.isnan(total_norm) or np.isnan(total_norm):
-                print('NAN!!!!!!!!!!!!!!!!!!!!!!')
-                exit()
-        opt.step()
+            if args.grad_clip > 0:
+                total_norm = nn.utils.clip_grad_norm_(params, args.grad_clip)
+                if total_norm != total_norm or math.isnan(total_norm) or np.isnan(total_norm):
+                    print('NAN!!!!!!!!!!!!!!!!!!!!!!')
+                    exit()
+            opt.step()
 
-        if iters % args.eval_every == 0:
-            args.logger.info("update {} : {}".format(iters, str(train_metrics)))
+            if iters % args.eval_every == 0:
+                args.logger.info("update {} : {}".format(iters, str(train_metrics)))
 
-        if iters % args.eval_every == 0 and not args.debug:
-            write_tb(writer, loss_names, [train_metrics.__getattr__(name) for name in loss_names],
-                     iters, prefix="train/")
-            write_tb(writer, monitor_names, [train_metrics.__getattr__(name) for name in monitor_names],
-                     iters, prefix="train/")
-            write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
-            train_metrics.reset()
+            if iters % args.eval_every == 0 and not args.debug:
+                write_tb(writer, loss_names, [train_metrics.__getattr__(name) for name in loss_names],
+                         iters, prefix="train/")
+                write_tb(writer, monitor_names, [train_metrics.__getattr__(name) for name in monitor_names],
+                         iters, prefix="train/")
+                write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
+                train_metrics.reset()
 
 
 def s2p_batch(fr_en_it, en_de_it, agents):
