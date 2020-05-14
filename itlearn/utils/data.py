@@ -3,12 +3,10 @@ import os
 import pickle as pickle
 from collections import Counter, OrderedDict
 from contextlib import ExitStack
-from itlearn.utils.misc import cuda
 import six
 import torch
 from torchtext import vocab, data
 from torchtext.data import Dataset
-
 
 UNK = '<unk>'
 BOS = '<bos>'
@@ -287,43 +285,6 @@ class MyExample(data.Example):
                     setattr(ex, name, field.preprocess(val))
         setattr(ex, "idx", idx)
         return ex
-
-
-class Multi30kIterator(data.BucketIterator):
-    def __iter__(self):
-        while True:
-            self.init_epoch()
-            for idx, minibatch in enumerate(self.batches):
-                # fast-forward if loaded from state
-                if self._iterations_this_epoch > idx:
-                    continue
-                self.iterations += 1
-                self._iterations_this_epoch += 1
-                if self.sort_within_batch:
-                    # NOTE: `rnn.pack_padded_sequence` requires that a minibatch
-                    # be sorted by decreasing order, which requires reversing
-                    # relative to typical sort keys
-                    if self.sort:
-                        minibatch.reverse()
-                    else:
-                        minibatch.sort(key=self.sort_key, reverse=True)
-                yield Multi30kBatch(minibatch, self.dataset, self.device)
-            if not self.repeat:
-                return
-
-
-class Multi30kBatch(data.Batch):
-    def __init__(self, data=None, dataset=None, device=None):
-        if data is not None:
-            self.batch_size = len(data)
-            self.dataset = dataset
-            self.fields = dataset.fields.keys()  # copy field names
-
-            for (name, field) in dataset.fields.items():
-                if field is not None:
-                    batch = [getattr(x, name) for x in data]
-                    setattr(self, name, field.process(batch, device=device))
-            setattr(self, "idx", cuda( torch.LongTensor( [e.idx for e in data] ) ))
 
 
 class LanguageModelingDataset(data.Dataset):

@@ -14,7 +14,8 @@ from utils.misc import write_tb
 from utils.bleu import computeBLEU, print_bleu
 from utils.hyperparams import Params
 from data import get_multi30k_iters, batch_size_fn
-from torchtext.data import Dataset, Example, BucketIterator, interleave_keys
+from torchtext.data import Dataset, Example, interleave_keys
+from itlearn.utils.iterator import BucketIterator
 from finetune.agents import AgentsGumbel
 import argparse
 
