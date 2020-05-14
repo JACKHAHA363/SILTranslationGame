@@ -2,10 +2,9 @@ import torch
 import os
 from os.path import join
 
-from torchtext import data
-
 from utils.data import UNK, BOS, EOS, batch_size_fn, TextVocab, NormalField, NormalTranslationDataset, \
-    TripleTranslationDataset, ParallelTranslationDataset, Multi30kIterator, LanguageModelingDataset, PAD
+    TripleTranslationDataset, ParallelTranslationDataset, LanguageModelingDataset, PAD
+from utils.iterator import BucketIterator, Multi30kIterator, BPTTIterator
 
 
 def get_s2p_dataset(args):
@@ -99,12 +98,12 @@ def get_wikitext_iters(bpe_path, dataset, device, en_vocab, train_repeat, batch_
                                          load_dataset=load_dataset, save_dataset=save_dataset)
     dev_data = LanguageModelingDataset(path=dev, field=EN,
                                        load_dataset=load_dataset, save_dataset=save_dataset)
-    train_it = data.BPTTIterator(train_data, batch_size, device=device,
-                                 train=True, repeat=train_repeat, shuffle=True,
-                                 bptt_len=seq_len)
-    dev_it = data.BPTTIterator(dev_data, batch_size, device=device,
-                               train=False, repeat=False,
-                               bptt_len=seq_len)
+    train_it = BPTTIterator(train_data, batch_size, device=device,
+                            train=True, repeat=train_repeat, shuffle=True,
+                            bptt_len=seq_len)
+    dev_it = BPTTIterator(dev_data, batch_size, device=device,
+                          train=False, repeat=False,
+                          bptt_len=seq_len)
     return EN, dev_it, train_it
 
 
@@ -186,11 +185,11 @@ def get_iwslt_iters(pair, bpe_path, de_vocab, device, en_vocab, fr_vocab, train_
     dev_data = NormalTranslationDataset(path=dev_path,
                                         exts=(src, trg), fields=(src_field, trg_field),
                                         load_dataset=load_dataset, save_dataset=save_dataset)
-    train_it = data.BucketIterator(train_data, batch_size, device=device,
-                                   batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
-                                   sort=False, sort_within_batch=True)
-    dev_it = data.BucketIterator(dev_data, batch_size, device=device,
-                                 batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
-                                 sort=False, sort_within_batch=True)
+    train_it = BucketIterator(train_data, batch_size, device=device,
+                              batch_size_fn=batch_size_fn, train=True, repeat=train_repeat, shuffle=True,
+                              sort=False, sort_within_batch=True)
+    dev_it = BucketIterator(dev_data, batch_size, device=device,
+                            batch_size_fn=batch_size_fn, train=False, repeat=False, shuffle=False,
+                            sort=False, sort_within_batch=True)
     return src_field, trg_field, train_it, dev_it
 
