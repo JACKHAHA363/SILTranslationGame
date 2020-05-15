@@ -137,19 +137,19 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
                     assert loss.grad_fn is not None
                     total_loss += loss * loss_cos[loss_name]
                 total_loss.backward()
-                rl_grad = torch.cat([p.grad.clone().reshape(-1) for p in params])
+                rl_grad = torch.cat([p.grad.clone().reshape(-1) for p in params if p.grad is not None])
 
                 opt.zero_grad()
                 fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
                 (fr_en_loss + en_de_loss).backward()
-                s2p_grad = torch.cat([p.grad.clone().reshape(-1) for p in params])
+                s2p_grad = torch.cat([p.grad.clone().reshape(-1) for p in params if p.grad is not None])
 
                 rl_grad_norm = torch.norm(rl_grad)
                 s2p_grad_norm = torch.norm(s2p_grad)
                 cosine = rl_grad.matmul(s2p_grad) / (rl_grad_norm * s2p_grad_norm)
-                writer.add_scalar("grad/rl_grad_norm", rl_grad_norm.item(), step=iters)
-                writer.add_scalar("grad/s2p_grad_norm", s2p_grad_norm.item(), step=iters)
-                writer.add_scalar("grad/cosine", cosine.item(), step=iters)
+                writer.add_scalar("grad/rl_grad_norm", rl_grad_norm.item(), global_step=iters)
+                writer.add_scalar("grad/s2p_grad_norm", s2p_grad_norm.item(), global_step=iters)
+                writer.add_scalar("grad/cosine", cosine.item(), global_step=iters)
 
 
 def s2p_batch(fr_en_it, en_de_it, agents):
