@@ -108,8 +108,6 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
             total_loss += args.s2p_co * (fr_en_loss + en_de_loss)
 
         total_loss.backward()
-        if args.plot_grad:
-            plot_grad(writer, model, iters)
 
         if args.grad_clip > 0:
             total_norm = nn.utils.clip_grad_norm_(params, args.grad_clip)
@@ -120,14 +118,38 @@ def joint_loop(args, model, train_it, dev_it, extra_input, loss_cos, loss_names,
 
         if iters % args.eval_every == 0:
             args.logger.info("update {} : {}".format(iters, str(train_metrics)))
-
-        if iters % args.eval_every == 0 and not args.debug:
             write_tb(writer, loss_names, [train_metrics.__getattr__(name) for name in loss_names],
                      iters, prefix="train/")
             write_tb(writer, monitor_names, [train_metrics.__getattr__(name) for name in monitor_names],
                      iters, prefix="train/")
             write_tb(writer, ['lr'], [opt.param_groups[0]['lr']], iters, prefix="train/")
             train_metrics.reset()
+
+            # Collect gradients
+            if args.plot_grad:
+                model.train()
+                opt.zero_grad()
+                R = model(train_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][0],
+                          ranker=extra_input["ranker"])
+                losses = [R[key] for key in loss_names]
+                total_loss = 0
+                for loss_name, loss in zip(loss_names, losses):
+                    assert loss.grad_fn is not None
+                    total_loss += loss * loss_cos[loss_name]
+                total_loss.backward()
+                rl_grad = torch.cat([p.grad.clone().reshape(-1) for p in params])
+
+                opt.zero_grad()
+                fr_en_loss, en_de_loss = s2p_batch(fr_en_it, en_de_it, model)
+                (fr_en_loss + en_de_loss).backward()
+                s2p_grad = torch.cat([p.grad.clone().reshape(-1) for p in params])
+
+                rl_grad_norm = torch.norm(rl_grad)
+                s2p_grad_norm = torch.norm(s2p_grad)
+                cosine = rl_grad.matmul(s2p_grad) / (rl_grad_norm * s2p_grad_norm)
+                writer.add_scalar("grad/rl_grad_norm", rl_grad_norm.item(), step=iters)
+                writer.add_scalar("grad/s2p_grad_norm", s2p_grad_norm.item(), step=iters)
+                writer.add_scalar("grad/cosine", cosine.item(), step=iters)
 
 
 def s2p_batch(fr_en_it, en_de_it, agents):
