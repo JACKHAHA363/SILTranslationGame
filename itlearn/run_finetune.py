@@ -37,11 +37,8 @@ args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
 JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn']
-folders = ["event", "model", "log", "param"]
-if args.setup in ['single'] + JOINT_SETUPS:
-    folders.append('decoding')
-if 'itlearn' in args.setup:
-    folders.append('misc')
+assert args.setup in JOINT_SETUPS
+folders = ["event", "model", "log", "param", "decoding", "misc"]
 
 for name in folders:
     folder = "{}/{}/".format(name, args.experiment) if hasattr(args, "experiment") else name + '/'
