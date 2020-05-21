@@ -1,10 +1,38 @@
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F
 
 from itlearn.utils.metrics import Metrics
 from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.misc import cuda, sum_reward
+
+
+def _supervise_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
+    dev_metrics = Metrics('s2p_dev', ['nll'])
+    with torch.no_grad():
+        agent.eval()
+        src_corpus, trg_corpus, hyp_corpus = [], [], []
+
+        for j, dev_batch in enumerate(dev_it):
+            if dataset == "iwslt" or dataset == 'iwslt_small':
+                src, src_len = dev_batch.src
+                trg, trg_len = dev_batch.trg
+            elif dataset == "multi30k":
+                src_lang, trg_lang = pair.split("_")
+                src, src_len = dev_batch.__dict__[src_lang]
+                trg, trg_len = dev_batch.__dict__[trg_lang]
+            logits, _ = agent(src[:, 1:], src_len - 1, trg[:, :-1])
+            nll = F.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
+                                  ignore_index=0)
+            num_trg = (trg_len - 1).sum().item()
+            dev_metrics.accumulate(num_trg, nll.item())
+            hyp = agent.decode(src, src_len, 'argmax', 0)
+            src_corpus.extend(agent.src.reverse(src))
+            trg_corpus.extend(agent.trg.reverse(trg))
+            hyp_corpus.extend(agent.trg.reverse(hyp))
+        bleu = computeBLEU(hyp_corpus, trg_corpus, corpus=True)
+    return dev_metrics, bleu
 
 
 def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
@@ -82,15 +110,6 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
             scores = (cap_feats.unsqueeze(1) * all_feat).sum(-1)
             r1_acc = (torch.argmax(scores, -1) == 0).float().mean()
             results['r1_acc'] = r1_acc
-
-    # NLL Real data
-    with torch.no_grad():
-        src, src_len = batch.__dict__['fr']
-        trg, trg_len = batch.__dict__['en']
-        logits, _ = model.fr_en(src[:, 1:], src_len - 1, trg[:, :-1])
-        nll = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1), reduction='mean',
-                                                ignore_index=0)
-        results['nll_real'] = nll
     return results, rewards
 
 
@@ -155,7 +174,7 @@ def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
 
 def _base_train(args, model, iterators, extra_input, loop, loss_names, loss_cos):
     train_it, dev_it = iterators
-    monitor_names = ['nll_real']
+    monitor_names = []
     if args.use_ranker:
         monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
         monitor_names.extend(["r1_acc"])

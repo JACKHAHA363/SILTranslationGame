@@ -114,6 +114,7 @@ def _gumbel_str(args):
              "gtemp{}_".format(args.gumbel_temp) + \
              "ratio{}_".format( args.msg_len_ratio ) + \
              "clip{}_".format(args.grad_clip)
+    return hp_str
 
 
 def get_hp_str(args):

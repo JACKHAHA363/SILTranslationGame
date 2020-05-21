@@ -129,7 +129,6 @@ def main_loop(args, err_type):
 
     # Opt
     fr_en_opt = torch.optim.Adam(model.fr_en.parameters(), lr=args.fr_en_lr)
-    monitor_names = ['nll_real']
     monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
     monitor_names.extend(["r1_acc"])
     monitor_names.append('en_nll_lm')
