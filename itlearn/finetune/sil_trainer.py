@@ -26,10 +26,8 @@ def plot_imitate_stats(teacher_stats, imitate_statss):
 
 
 class SILTrainer(Trainer):
-    def __init__(self, args, model, train_it, dev_it, extra_input,
-                 loss_cos, loss_names, monitor_names):
-        super(SILTrainer, self).__init__(args, model, train_it, dev_it, extra_input,
-                                         loss_cos, loss_names, monitor_names)
+    def __init__(self, args, model, train_it, dev_it, extra_input):
+        super(SILTrainer, self).__init__(args, model, train_it, dev_it, extra_input)
         use_sil = hasattr(args, 'k1') and hasattr(args, 'fr_en_k2') and hasattr(args, 'en_de_k2')
         assert use_sil
 

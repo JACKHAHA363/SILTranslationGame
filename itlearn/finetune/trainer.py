@@ -11,6 +11,7 @@ import time
 from itlearn.utils.metrics import Metrics, Best
 from itlearn.finetune.agents_utils import valid_model, eval_model
 from itlearn.utils.misc import write_tb
+from itlearn.finetune.agents import AgentsA2C, AgentsGumbel
 
 
 def _get_nll(model, src, src_len, trg):
@@ -21,16 +22,59 @@ def _get_nll(model, src, src_len, trg):
 
 
 class Trainer:
-    def __init__(self, args, model, train_it, dev_it, extra_input,
-                 loss_cos, loss_names, monitor_names):
+    def __init__(self, args, model, train_it, dev_it, extra_input):
         self.args = args
         self.model = model
         self.train_it = train_it
         self.dev_it = dev_it
         self.extra_input = extra_input
-        self.loss_cos = loss_cos
-        self.loss_names = loss_names
-        self.monitor_names = monitor_names
+
+        # Prepare loss
+        self.loss_names = ['ce_loss']
+        self.loss_cos = {"ce_loss": args.ce_co}
+        if isinstance(model, AgentsA2C):
+            args.logger.info('Train with A2C')
+            self.loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
+            self.loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
+        elif isinstance(model, AgentsGumbel):
+            args.logger.info('Train with Gumbel')
+            args.logger.info("Don't train entropy but observe it")
+            self.loss_names.extend(['neg_Hs'])
+            self.loss_cos.update({'neg_Hs': 0.})
+
+            # Use LM reward
+            if args.train_en_lm:
+                args.logger.info('Train with LM reward {}'.format(args.en_lm_nll_co))
+                self.loss_names.extend(['en_nll_lm'])
+                self.loss_cos['en_nll_lm'] = args.en_lm_nll_co
+
+                # Use entropy coef as well. If KL then h_co = en_lm_nll_co
+                args.logger.info('Train entropy with {}'.format(args.h_co))
+                self.loss_cos['neg_Hs'] = args.h_co
+
+            if args.train_ranker:
+                img_pred_loss_name = "img_pred_loss_{}".format(args.img_pred_loss)
+                args.logger.info('Train with grounding reward')
+                self.loss_names.extend([img_pred_loss_name])
+                self.loss_cos[img_pred_loss_name] = args.img_pred_loss_co
+        else:
+            raise ValueError
+        args.logger.info('--------------- Loss -----------------')
+        for loss_name, coef in zip(self.loss_names, self.loss_cos):
+            args.logger.info('{}: {}'.format(loss_name, coef))
+        args.logger.info('--------------------------------------')
+
+        # Prepare monitor names
+        self.monitor_names = []
+        if args.use_ranker:
+            self.monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
+            self.monitor_names.extend(["r1_acc"])
+        if args.use_en_lm:
+            self.monitor_names.append('en_nll_lm')
+        args.logger.info('------------Monitor---------------')
+        for monitor_name in self.monitor_names:
+            args.logger.info(monitor_name)
+        args.logger.info('----------------------------------')
 
         # Prepare writer
         self.writer = SummaryWriter( args.event_path + args.id_str)

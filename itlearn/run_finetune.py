@@ -10,9 +10,7 @@ from utils.misc import set_seed, get_logger
 from models.agent import ImageCaptioning, RNNLM, ImageGrounding
 from utils.hyperparams import Params, get_hp_str
 from data import get_s2p_dataset
-from finetune.agents_utils import train_a2c_model, train_gumbel_model
-from finetune.train_joint import joint_loop
-from finetune.train_iterlearn import itlearn_loop
+from finetune import SILTrainer, Trainer
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -147,18 +145,12 @@ if torch.cuda.device_count() > 0 and args.gpu > -1:
     model.cuda(args.gpu)
 
 # Main
-if args.setup == "a2c":
-    train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
+if args.setup == "a2c" or args.setup == 'gumbel':
+    trainer = Trainer(args, model, train_it, dev_it, extra_input)
 
-elif args.setup == 'a2c_sil':
-    train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
-
-elif args.setup == 'gumbel':
-    train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
-
-elif args.setup == 'gumbel_sil':
-    train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
+elif args.setup == 'a2c_sil' or args.setup == 'gumbel_sil':
+    trainer = SILTrainer(args, model, train_it, dev_it, extra_input)
 else:
     raise ValueError
-
+trainer.start()
 args.logger.info("done.")
