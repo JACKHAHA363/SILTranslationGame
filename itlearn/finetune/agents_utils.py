@@ -4,8 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from itlearn.utils.metrics import Metrics
-from itlearn.utils.bleu import computeBLEU, print_bleu
-from itlearn.utils.misc import cuda, sum_reward
+from itlearn.utils.bleu import computeBLEU
 
 
 def supervise_evaluate_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
@@ -33,82 +32,3 @@ def supervise_evaluate_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
             hyp_corpus.extend(agent.trg.reverse(hyp))
         bleu = computeBLEU(hyp_corpus, trg_corpus, corpus=True)
     return dev_metrics, bleu
-
-
-def forward_fr_en(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
-                  use_gumbel_tokens=False):
-    """ Evaluate this eng sentence with different metric. Can be used as reward """
-    results = {}
-    rewards = {}
-    batch_size = en_msg.shape[0]
-    # NOTE add <BOS> to beginning
-    en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), model.init_token)).long(), en_msg], dim=1)
-    gumbel_tokens = None
-    if use_gumbel_tokens:
-        gumbel_tokens = model.fr_en.dec.gumbel_tokens
-        init_tokens = torch.zeros([gumbel_tokens.shape[0], 1, gumbel_tokens.shape[2]])
-        init_tokens = init_tokens.to(device=gumbel_tokens.device)
-        init_tokens[:, :, model.init_token] = 1
-        gumbel_tokens = torch.cat([init_tokens, gumbel_tokens], dim=1)
-
-    if model.use_en_lm:  # monitor EN LM NLL
-        if "wiki" in model.en_lm_dataset:
-            if use_gumbel_tokens:
-                raise NotImplementedError
-            en_nll_lm = en_lm.get_nll(en_msg_)  # (batch_size, en_msg_len)
-            if model.train_en_lm:
-                en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
-                rewards['lm'] = -1 * en_nll_lm.detach()
-                # R = R + -1 * en_nll_lm.detach() * self.en_lm_nll_co # (batch_size)
-            results.update({"en_nll_lm": en_nll_lm.mean()})
-
-        elif model.en_lm_dataset in ["coco", "multi30k"]:
-            if use_gumbel_tokens:
-                en_lm.train()
-                en_nll_lm = en_lm.get_loss_oh(gumbel_tokens, None)
-                en_lm.eval()
-            else:
-                en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
-            if model.train_en_lm:
-                en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
-                rewards['lm'] = -1 * en_nll_lm.detach()
-            results.update({"en_nll_lm": en_nll_lm.mean()})
-        else:
-            raise Exception()
-
-    if model.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
-        if use_gumbel_tokens and model.train_ranker:
-            raise NotImplementedError
-        ranker.eval()
-        img = cuda(all_img.index_select(dim=0, index=batch.idx.cpu()))  # (batch_size, D_img)
-
-        if model.img_pred_loss == "nll":
-            img_pred_loss = ranker.get_loss(en_msg_, img)  # (batch_size, en_msg_len)
-            img_pred_loss = sum_reward(img_pred_loss, en_msg_len + 1)  # (batch_size)
-        else:
-            with torch.no_grad():
-                img_pred_loss = ranker(en_msg, en_msg_len, img)["loss"]
-
-        if model.train_ranker:
-            rewards['img_pred'] = -1 * img_pred_loss.detach()
-        results.update({"img_pred_loss_{}".format(model.img_pred_loss): img_pred_loss.mean()})
-
-        # Get ranker retrieval result
-        with torch.no_grad():
-            K = 19
-            # Randomly select K distractor image
-            random_idx = torch.randint(all_img.shape[0], size=[batch_size, K])
-            wrong_img = cuda(all_img.index_select(dim=0, index=random_idx.view(-1)))
-            wrong_img_feat = ranker.batch_enc_img(wrong_img).view(batch_size, K, -1)
-            right_img_feat = ranker.batch_enc_img(img)
-
-            # [bsz, K+1, hid_size]
-            all_feat = torch.cat([right_img_feat.unsqueeze(1), wrong_img_feat], dim=1)
-
-            # [bsz, hid_size]
-            cap_feats = ranker.batch_cap_rep(en_msg, en_msg_len)
-            scores = (cap_feats.unsqueeze(1) * all_feat).sum(-1)
-            r1_acc = (torch.argmax(scores, -1) == 0).float().mean()
-            results['r1_acc'] = r1_acc
-    return results, rewards
-

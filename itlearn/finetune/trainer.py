@@ -10,7 +10,6 @@ import time
 
 from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.metrics import Metrics, Best
-from itlearn.finetune.agents_utils import forward_fr_en
 from itlearn.utils.misc import write_tb
 from itlearn.finetune.agents import AgentsA2C, AgentsGumbel
 
@@ -209,10 +208,10 @@ class Trainer:
                 en_msg, de_msg, en_msg_len, _ = self.model.decode(dev_batch)
                 en_hyp.extend(self.args.EN.reverse(en_msg, unbpe=unbpe))
                 de_hyp.extend(self.args.DE.reverse(de_msg, unbpe=unbpe))
-                results, _ = forward_fr_en(self.model, en_msg, en_msg_len, dev_batch,
-                                           en_lm=self.extra_input["en_lm"],
-                                           all_img=self.extra_input["img"]['multi30k'][1],
-                                           ranker=self.extra_input["ranker"])
+                results, _ = self.model.forward_fr_en(en_msg, en_msg_len, dev_batch,
+                                                      en_lm=self.extra_input["en_lm"],
+                                                      all_img=self.extra_input["img"]['multi30k'][1],
+                                                      ranker=self.extra_input["ranker"])
                 if len(self.monitor_names) > 0:
                     eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in self.monitor_names])
 
