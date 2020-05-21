@@ -1,15 +1,23 @@
 """
-Utility for loop
+Trainers
 """
 from tensorboardX import SummaryWriter
 from pathlib import Path
 import math
 import numpy as np
 import torch
+import time
 
 from itlearn.utils.metrics import Metrics, Best
 from itlearn.finetune.agents_utils import valid_model, eval_model
 from itlearn.utils.misc import write_tb
+
+
+def _get_nll(model, src, src_len, trg):
+    logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
+    loss = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
+                                             reduction='mean', ignore_index=0)
+    return loss
 
 
 class Trainer:
@@ -26,6 +34,7 @@ class Trainer:
 
         # Prepare writer
         self.writer = SummaryWriter( args.event_path + args.id_str)
+        self.resume = 'resume' in extra_input
 
         # Prepare opt
         if args.fix_fr2en:
@@ -37,49 +46,74 @@ class Trainer:
             self.opt = torch.optim.Adam(self.params, betas=(0.9, 0.98), eps=1e-9, lr=args.lr)
         else:
             raise NotImplementedError
+        if self.resume:
+            self.opt.load_state_dict(extra_input['resume']['opt'])
 
         # Prepare S2P
+        self.use_s2p = hasattr(args, 's2p_freq') and args.s2p_freq > 0
         self.s2p_steps = args.__dict__.get('s2p_steps', args.max_training_steps)
-        self.s2p_fr_en_it, self.s2p_en_de_it = None, None
-        if hasattr(args, 's2p_freq') and args.s2p_freq > 0:
+        if self.use_s2p:
             args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
             fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'], extra_input['s2p_its']['en_de']
             self.s2p_fr_en_it = iter(fr_en_it)
             self.s2p_en_de_it = iter(en_de_it)
 
-    def joint_training(self):
+    def start(self):
         # Prepare Metrics
         train_metrics = Metrics('train_loss', *self.loss_names, *self.monitor_names, data_type="avg")
         best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=self.model, opt=self.opt,
                     path=self.args.model_path + self.args.id_str,
                     gpu=self.args.gpu, debug=self.args.debug)
+        # Determine when to stop iterlearn
+        iters = self.extra_input['resume']['iters'] if self.resume else 0
+        self.args.logger.info('Start Training at iters={}'.format(iters))
+        try:
+            train_it = iter(self.train_it)
+            while iters < self.args.max_training_steps:
+                train_batch = train_it.__next__()
+                if iters >= self.args.max_training_steps:
+                    self.args.logger.info('stopping training after {} training steps'.format(self.args.max_training_steps))
+                    break
 
-        for iters, train_batch in enumerate(self.train_it):
-            if iters >= self.args.max_training_steps:
-                self.args.logger.info('stopping training after {} training steps'.format(self.args.max_training_steps))
-                break
+                self._maybe_save(iters)
 
-            self._maybe_save(iters)
+                if iters % self.args.eval_every == 0:
+                    self.model.eval()
+                    self.eval_loop(iters, best)
 
-            if iters % self.args.eval_every == 0:
-                self.eval_loop(iters, best)
+                self.model.train()
+                self.train_step(iters, train_batch)
 
-            self.selfplay_step(iters, train_batch)
+                if iters % self.args.eval_every == 0:
+                    self.args.logger.info("update {} : {}".format(iters, str(train_metrics)))
+                    write_tb(self.writer, self.loss_names,
+                             [train_metrics.__getattr__(name) for name in self.loss_names],
+                             iters, prefix="train/")
+                    write_tb(self.writer, self.monitor_names,
+                             [train_metrics.__getattr__(name) for name in self.monitor_names],
+                             iters, prefix="train/")
+                    write_tb(self.writer, ['lr'], [self.opt.param_groups[0]['lr']], iters, prefix="train/")
+                    train_metrics.reset()
 
-            if iters % self.args.eval_every == 0:
-                self.args.logger.info("update {} : {}".format(iters, str(train_metrics)))
-                write_tb(self.writer, self.loss_names,
-                         [train_metrics.__getattr__(name) for name in self.loss_names],
-                         iters, prefix="train/")
-                write_tb(self.writer, self.monitor_names,
-                         [train_metrics.__getattr__(name) for name in self.monitor_names],
-                         iters, prefix="train/")
-                write_tb(self.writer, ['lr'], [self.opt.param_groups[0]['lr']], iters, prefix="train/")
-                train_metrics.reset()
+                    if self.args.plot_grad:
+                        self.model.train()
+                        self._plot_grad(iters, train_batch)
 
-                if self.args.plot_grad:
-                    self._plot_grad(iters, train_batch)
+                iters += 1
+        except (InterruptedError, KeyboardInterrupt):
+            # End Gracefully
+            self.end_gracefully(iters)
 
+    def train_step(self, iters, train_batch):
+        self.selfplay_step(iters, train_batch)
+
+    def end_gracefully(self, iters):
+        self.args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
+        with torch.cuda.device(self.args.gpu):
+            status = {'iters': iters,
+                      'model': self.model.state_dict(),
+                      'opt': self.opt.state_dict()}
+            torch.save(status, '{}_latest.pt'.format(self.args.model_path + self.args.id_str))
 
     def _maybe_save(self, iters):
         if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
@@ -92,7 +126,6 @@ class Trainer:
 
     def selfplay_step(self, iters, train_batch):
         """ Perform a step of selfplay """
-        self.model.train()
         if hasattr(self.args, 'lr_anneal') and self.args.lr_anneal == "linear":
             self.opt.param_groups[0]['lr'] = self._get_lr_anneal(iters)
         if hasattr(self.args, 'h_co_anneal') and self.args.h_co_anneal == "linear":
@@ -111,7 +144,7 @@ class Trainer:
                                       *[R[k].item() for k in self.monitor_names])
 
         # Add S2P Grad
-        if self.args.s2p_freq > 0 and iters % self.args.s2p_freq == 0:
+        if self.use_s2p and iters % self.args.s2p_freq == 0:
             fr_en_loss, en_de_loss = self._s2p_batch()
             total_loss += self.args.s2p_co * (fr_en_loss + en_de_loss)
 
@@ -160,7 +193,7 @@ class Trainer:
 
     def _plot_grad(self, iters, train_batch):
         """ plot the gradients for selfplau and supervise """
-        self.model.train()
+        assert self.use_s2p
         self.opt.zero_grad()
         R = self.model(train_batch, en_lm=self.extra_input["en_lm"],
                        all_img=self.extra_input["img"]['multi30k'][0],
@@ -195,13 +228,3 @@ class Trainer:
                               en_de_batch.src[1],
                               en_de_batch.trg[0])
         return fr_en_loss, en_de_loss
-
-
-def _get_nll(model, src, src_len, trg):
-    logits, _ = model(src[:, 1:], src_len - 1, trg[:, :-1])
-    loss = torch.nn.functional.cross_entropy(logits, trg[:, 1:].contiguous().view(-1),
-                                             reduction='mean', ignore_index=0)
-    return loss
-
-
-
