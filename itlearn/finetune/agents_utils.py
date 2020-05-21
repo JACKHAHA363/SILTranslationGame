@@ -113,18 +113,17 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
     return results, rewards
 
 
-def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
+def eval_model(args, model, dev_it, monitor_names, extra_input):
     """ Use greedy decoding and check scores like BLEU, language model and grounding """
     eval_metrics = Metrics('dev_loss', *monitor_names, data_type="avg")
     eval_metrics.reset()
     with torch.no_grad():
         unbpe = True
         model.eval()
-        fr_corpus, en_corpus, de_corpus = [], [], []
+        en_corpus, de_corpus = [], []
         en_hyp, de_hyp = [], []
 
         for j, dev_batch in enumerate(dev_it):
-            fr_corpus.extend(args.FR.reverse(dev_batch.fr[0], unbpe=unbpe))
             en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
             de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
 
@@ -146,13 +145,7 @@ def eval_model(args, model, dev_it, monitor_names, iters, extra_input):
         args.logger.info(eval_metrics)
         args.logger.info("Fr-En {} : {}".format('valid', print_bleu(bleu_en)))
         args.logger.info("En-De {} : {}".format('valid', print_bleu(bleu_de)))
-
-        if not args.debug:
-            dest_folders = [Path(args.decoding_path) / args.id_str / name for name in
-                            ["en_ref", "de_ref", "fr_ref", "de_hyp_{}".format(iters), "en_hyp_{}".format(iters)]]
-            [dest.write_text("\n".join(string), encoding="utf-8")
-             for (dest, string) in zip(dest_folders, [en_corpus, de_corpus, fr_corpus, de_hyp, en_hyp])]
-        return eval_metrics, bleu_en, bleu_de
+        return eval_metrics, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp
 
 
 def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
