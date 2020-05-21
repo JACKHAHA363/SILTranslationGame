@@ -6,12 +6,10 @@ from pathlib import Path
 import math
 import numpy as np
 import torch
-import time
 
 from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.metrics import Metrics, Best
 from itlearn.utils.misc import write_tb
-from itlearn.finetune.agents import AgentsA2C, AgentsGumbel
 
 
 def _get_nll(model, src, src_len, trg):
@@ -32,11 +30,12 @@ class Trainer:
         # Prepare loss
         self.loss_names = ['ce_loss']
         self.loss_cos = {"ce_loss": args.ce_co}
-        if isinstance(model, AgentsA2C):
+        agents_type = model.__class__.__name__
+        if agents_type == 'AgentsA2C':
             args.logger.info('Train with A2C')
             self.loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
             self.loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
-        elif isinstance(model, AgentsGumbel):
+        elif agents_type == 'AgentsGumbel':
             args.logger.info('Train with Gumbel')
             args.logger.info("Don't train entropy but observe it")
             self.loss_names.extend(['neg_Hs'])
@@ -102,6 +101,10 @@ class Trainer:
             self.s2p_fr_en_it = iter(fr_en_it)
             self.s2p_en_de_it = iter(en_de_it)
 
+        # Make decoding path
+        decoding_path = Path(args.decoding_path + args.id_str)
+        decoding_path.mkdir(parents=True, exist_ok=True)
+
     def start(self):
         # Prepare Metrics
         train_metrics = Metrics('train_loss', *self.loss_names, *self.monitor_names, data_type="avg")
@@ -126,7 +129,7 @@ class Trainer:
                     self.evaluate(iters, best)
 
                 self.model.train()
-                self.train_step(iters, train_batch)
+                self.train_step(iters, train_batch, train_metrics)
 
                 if iters % self.args.eval_every == 0:
                     self.args.logger.info("update {} : {}".format(iters, str(train_metrics)))
@@ -148,19 +151,8 @@ class Trainer:
             # End Gracefully
             self.end_gracefully(iters)
 
-    def train_step(self, iters, train_batch):
-        self.selfplay_step(iters, train_batch)
-
-    def end_gracefully(self, iters):
-        self.args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
-        with torch.cuda.device(self.args.gpu):
-            status = {'iters': iters,
-                      'model': self.model.state_dict(),
-                      'opt': self.opt.state_dict()}
-            torch.save(status, '{}_latest.pt'.format(self.args.model_path + self.args.id_str))
-
-    def selfplay_step(self, iters, train_batch):
-        """ Perform a step of selfplay """
+    def train_step(self, iters, train_batch, train_metrics):
+        """ Perform a step of selfplay as well as supervise loss if necessary """
         if hasattr(self.args, 'lr_anneal') and self.args.lr_anneal == "linear":
             self.opt.param_groups[0]['lr'] = self._get_lr_anneal(iters)
         if hasattr(self.args, 'h_co_anneal') and self.args.h_co_anneal == "linear":
@@ -175,8 +167,8 @@ class Trainer:
         total_loss = 0
         for loss_name, loss in zip(self.loss_names, losses):
             total_loss += loss * self.loss_cos[loss_name]
-        self.train_metrics.accumulate(batch_size, *[loss.item() for loss in losses],
-                                      *[R[k].item() for k in self.monitor_names])
+        train_metrics.accumulate(batch_size, *[loss.item() for loss in losses],
+                                 *[R[k].item() for k in self.monitor_names])
 
         # Add S2P Grad
         if self.use_s2p and iters % self.args.s2p_freq == 0:
@@ -190,6 +182,16 @@ class Trainer:
                 print('NAN!!!!!!!!!!!!!!!!!!!!!!')
                 exit()
         self.opt.step()
+
+    def end_gracefully(self, iters):
+        self.args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
+        self.writer.flush()
+        self.writer.close()
+        with torch.cuda.device(self.args.gpu):
+            status = {'iters': iters,
+                      'model': self.model.state_dict(),
+                      'opt': self.opt.state_dict()}
+            torch.save(status, '{}_latest.pt'.format(self.args.model_path + self.args.id_str))
 
     def evaluate_communication(self):
         """ Use greedy decoding and check scores like BLEU, language model and grounding """

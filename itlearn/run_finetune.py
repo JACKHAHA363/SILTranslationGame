@@ -56,7 +56,6 @@ args.save((str(args.param_path + args.id_str)))
 train_it, dev_it = get_data(args)
 
 args.__dict__.update({'logger': logger})
-args.logger.info(args)
 args.logger.info('Starting with HPARAMS: {}'.format(args.hp_str))
 
 # Model
@@ -129,17 +128,6 @@ if hasattr(args, 'fr_en_ckpt') and args.fr_en_ckpt is not None:
         for param in list(model.fr_en.parameters()):
             param.requires_grad = False
         args.logger.info("Fixed FR->EN agent")
-
-args.logger.info(str(model))
-
-# Params
-params, param_names = [], []
-for name, param in model.named_parameters():
-    params.append(param)
-    param_names.append(name)
-    args.logger.info("{} {} {}".format(name, param.size(), "-----FIXED-----" if not param.requires_grad else ""))
-
-args.logger.info("Model size {:,}".format( sum( [ np.prod(x.size()) for x in params ] )) )
 
 if torch.cuda.device_count() > 0 and args.gpu > -1:
     model.cuda(args.gpu)

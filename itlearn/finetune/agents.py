@@ -181,7 +181,7 @@ class AgentsA2C(BaseAgents):
 
         # Speak fr en first
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, fr_en_rewards = self.forward_fr_en(self, en_msg, en_msg_len, batch, en_lm=en_lm,
+        fr_en_results, fr_en_rewards = self.forward_fr_en(en_msg, en_msg_len, batch, en_lm=en_lm,
                                                           all_img=all_img, ranker=ranker)
         results.update(fr_en_results)
         rewards.update(fr_en_rewards)
@@ -251,7 +251,7 @@ class AgentsGumbel(BaseAgents):
         """ Create training graph """
         results = {}
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, _ = self.forward_fr_en(self, en_msg, en_msg_len, batch, en_lm=en_lm,
+        fr_en_results, _ = self.forward_fr_en(en_msg, en_msg_len, batch, en_lm=en_lm,
                                               all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
         results.update(fr_en_results)
 

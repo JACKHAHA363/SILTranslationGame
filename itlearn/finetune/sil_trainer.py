@@ -65,8 +65,11 @@ class SILTrainer(Trainer):
             self.stu_en_de_opt = torch.optim.Adam(self.student.en_de.parameters(), betas=(0.9, 0.98),
                                                   eps=1e-9, lr=self.args.en_de_lr)
 
-    def train_step(self, iters, train_batch):
-        self.selfplay_step(iters, train_batch)
+    def train_step(self, iters, train_batch, train_metrics):
+        # A step of selfplay
+        super(SILTrainer, self).train_step(iters, train_batch, train_metrics)
+
+        # Then SIL if necessary
         if (iters + 1) % self.args.k1 == 0 and (iters + 1) < self.max_itlearn_steps:
             self.args.logger.info('start imitating at iters {}'.format(iters + 1))
             self.sil_training(iters)
