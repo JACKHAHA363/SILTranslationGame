@@ -28,23 +28,19 @@ class Trainer:
         self.extra_input = extra_input
 
         # Prepare loss
-        self.loss_names = ['ce_loss']
         self.loss_cos = {"ce_loss": args.ce_co}
         agents_type = model.__class__.__name__
         if agents_type == 'AgentsA2C':
             args.logger.info('Train with A2C')
-            self.loss_names.extend(['pg_loss', 'b_loss', 'neg_Hs'])
             self.loss_cos.update({'pg_loss': args.pg_co, 'b_loss': args.b_co, 'neg_Hs': args.h_co})
         elif agents_type == 'AgentsGumbel':
             args.logger.info('Train with Gumbel')
             args.logger.info("Don't train entropy but observe it")
-            self.loss_names.extend(['neg_Hs'])
             self.loss_cos.update({'neg_Hs': 0.})
 
             # Use LM reward
             if args.train_en_lm:
                 args.logger.info('Train with LM reward {}'.format(args.en_lm_nll_co))
-                self.loss_names.extend(['en_nll_lm'])
                 self.loss_cos['en_nll_lm'] = args.en_lm_nll_co
 
                 # Use entropy coef as well. If KL then h_co = en_lm_nll_co
@@ -54,17 +50,16 @@ class Trainer:
             if args.train_ranker:
                 img_pred_loss_name = "img_pred_loss_{}".format(args.img_pred_loss)
                 args.logger.info('Train with grounding reward')
-                self.loss_names.extend([img_pred_loss_name])
                 self.loss_cos[img_pred_loss_name] = args.img_pred_loss_co
         else:
             raise ValueError
         args.logger.info('--------------- Loss -----------------')
-        for loss_name, coef in zip(self.loss_names, self.loss_cos):
-            args.logger.info('{}: {}'.format(loss_name, coef))
+        for name, coef in self.loss_cos.items():
+            args.logger.info('{}: {}'.format(name, coef))
         args.logger.info('--------------------------------------')
 
         # Prepare monitor names
-        self.monitor_names = []
+        self.monitor_names = ["neg_Hs"]
         if args.use_ranker:
             self.monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
             self.monitor_names.extend(["r1_acc"])
@@ -107,7 +102,7 @@ class Trainer:
 
     def start(self):
         # Prepare Metrics
-        train_metrics = Metrics('train_loss', *self.loss_names, *self.monitor_names, data_type="avg")
+        train_metrics = Metrics('train_loss', *list(self.loss_cos.keys()), *self.monitor_names, data_type="avg")
         best = Best(max, 'de_bleu', 'en_bleu', 'iters', model=self.model, opt=self.opt,
                     path=self.args.model_path + self.args.id_str,
                     gpu=self.args.gpu, debug=self.args.debug)
@@ -133,13 +128,11 @@ class Trainer:
 
                 if iters % self.args.eval_every == 0:
                     self.args.logger.info("update {} : {}".format(iters, str(train_metrics)))
-                    write_tb(self.writer, self.loss_names,
-                             [train_metrics.__getattr__(name) for name in self.loss_names],
-                             iters, prefix="train/")
-                    write_tb(self.writer, self.monitor_names,
-                             [train_metrics.__getattr__(name) for name in self.monitor_names],
-                             iters, prefix="train/")
-                    write_tb(self.writer, ['lr'], [self.opt.param_groups[0]['lr']], iters, prefix="train/")
+                    train_stats = {}
+                    train_stats.update({name: train_metrics.__getattr__(name) for name in self.loss_cos})
+                    train_stats.update({name: train_metrics.__getattr__(name) for name in self.monitor_names})
+                    train_stats['lr'] = self.opt.param_groups[0]['lr']
+                    write_tb(self.writer, train_stats, iters, prefix="train/")
                     train_metrics.reset()
 
                     if self.args.plot_grad:
@@ -160,15 +153,15 @@ class Trainer:
 
         self.opt.zero_grad()
         batch_size = len(train_batch)
-        R = self.model(train_batch, en_lm=self.extra_input["en_lm"],
-                       all_img=self.extra_input["img"]['multi30k'][0],
-                       ranker=self.extra_input["ranker"])
-        losses = [R[key] for key in self.loss_names]
+        train_result = self.model(train_batch, en_lm=self.extra_input["en_lm"],
+                                  all_img=self.extra_input["img"]['multi30k'][0],
+                                  ranker=self.extra_input["ranker"])
         total_loss = 0
-        for loss_name, loss in zip(self.loss_names, losses):
-            total_loss += loss * self.loss_cos[loss_name]
-        train_metrics.accumulate(batch_size, *[loss.item() for loss in losses],
-                                 *[R[k].item() for k in self.monitor_names])
+        for loss_name, loss_co in self.loss_cos.items():
+            if loss_co == 0:
+                continue
+            total_loss += loss_co * train_result[loss_name]
+        train_metrics.accumulate(batch_size, **train_result)
 
         # Add S2P Grad
         if self.use_s2p and iters % self.args.s2p_freq == 0:
@@ -210,12 +203,16 @@ class Trainer:
                 en_msg, de_msg, en_msg_len, _ = self.model.decode(dev_batch)
                 en_hyp.extend(self.args.EN.reverse(en_msg, unbpe=unbpe))
                 de_hyp.extend(self.args.DE.reverse(de_msg, unbpe=unbpe))
-                results, _ = self.model.forward_fr_en(en_msg, en_msg_len, dev_batch,
+                results, _ = self.model.get_grounding(en_msg, en_msg_len, dev_batch,
                                                       en_lm=self.extra_input["en_lm"],
                                                       all_img=self.extra_input["img"]['multi30k'][1],
                                                       ranker=self.extra_input["ranker"])
+                # Get entropy
+                neg_Hs = self.model.fr_en.dec.neg_Hs  # (batch_size, en_msg_len)
+                neg_Hs = neg_Hs.mean()  # (1,)
+                results["neg_Hs"] = neg_Hs
                 if len(self.monitor_names) > 0:
-                    eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in self.monitor_names])
+                    eval_metrics.accumulate(len(dev_batch), **results)
 
             bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
             bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
@@ -224,34 +221,14 @@ class Trainer:
             self.args.logger.info("En-De {} : {}".format('valid', print_bleu(bleu_de)))
             return eval_metrics, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp
 
-    def valid_model(self):
-        """ Run reinforce on validation and record stats """
-        dev_metrics = Metrics('dev_loss', *self.loss_names, *self.monitor_names, data_type="avg")
-        dev_metrics.reset()
-        with torch.no_grad():
-            self.model.eval()
-            for j, dev_batch in enumerate(self.dev_it):
-                R = self.model(dev_batch, en_lm=self.extra_input["en_lm"],
-                               all_img=self.extra_input["img"]['multi30k'][1],
-                               ranker=self.extra_input["ranker"])
-                losses = [R[key] for key in self.loss_names]
-                dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
-                                       *[R[k].item() for k in self.monitor_names])
-        return dev_metrics
-
     def evaluate(self, iters, best):
-        dev_metrics = self.valid_model()
+        """ Free Run """
         eval_metric, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp = self.evaluate_communication()
-        write_tb(self.writer, self.loss_names, [dev_metrics.__getattr__(name) for name in self.loss_names],
-                 iters, prefix="dev/")
-        write_tb(self.writer, self.monitor_names, [dev_metrics.__getattr__(name) for name in self.monitor_names],
-                 iters, prefix="dev/")
-        write_tb(self.writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_en, iters,
-                 prefix="bleu_en/")
-        write_tb(self.writer, ['bleu', *("p_1 p_2 p_3 p_4".split()), 'bp', 'len_ref', 'len_hyp'], bleu_de, iters,
-                 prefix="bleu_de/")
-        write_tb(self.writer, ["bleu_en", "bleu_de"], [bleu_en[0], bleu_de[0]], iters, prefix="eval/")
-        write_tb(self.writer, self.monitor_names, [eval_metric.__getattr__(name) for name in self.monitor_names],
+        bleu_names = ['bleu', "p_1", "p_2", "p_3", "p_4", 'bp', 'len_ref', 'len_hyp']
+        write_tb(self.writer, {name: val for name, val in zip(bleu_names, bleu_en)}, iters, prefix='bleu_en/')
+        write_tb(self.writer, {name: val for name, val in zip(bleu_names, bleu_de)}, iters, prefix='bleu_de/')
+        write_tb(self.writer, {"bleu_en": bleu_en[0], "bleu_de": bleu_de[0]}, iters, prefix="eval/")
+        write_tb(self.writer, {name: eval_metric.__getattr__(name) for name in self.monitor_names},
                  iters, prefix="eval/")
         self.args.logger.info('model:' + self.args.prefix + self.args.hp_str)
         best.accumulate(bleu_de[0], bleu_en[0], iters)
@@ -286,14 +263,15 @@ class Trainer:
         """ plot the gradients for selfplau and supervise """
         assert self.use_s2p
         self.opt.zero_grad()
-        R = self.model(train_batch, en_lm=self.extra_input["en_lm"],
-                       all_img=self.extra_input["img"]['multi30k'][0],
-                       ranker=self.extra_input["ranker"])
-        losses = [R[key] for key in self.loss_names]
+        fwd_results = self.model(train_batch, en_lm=self.extra_input["en_lm"],
+                                 all_img=self.extra_input["img"]['multi30k'][0],
+                                 ranker=self.extra_input["ranker"])
         total_loss = 0
-        for loss_name, loss in zip(self.loss_names, losses):
-            assert loss.grad_fn is not None
-            total_loss += loss * self.loss_cos[loss_name]
+        for name, co in self.loss_cos.items():
+            if co == 0:
+                continue
+            assert fwd_results[name].grad_fn is not None
+            total_loss += co * fwd_results[name]
         total_loss.backward()
         rl_grad = torch.cat([p.grad.clone().reshape(-1) for p in self.params if p.grad is not None])
         self.opt.zero_grad()

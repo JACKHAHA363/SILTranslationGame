@@ -96,7 +96,7 @@ def get_fr_en_stats(args, model, dev_it, monitor_names, extra_input):
             en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
             en_msg, en_msg_len = model.fr_en_speak(dev_batch, is_training=False)
             en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
-            results, _ = model.forward_fr_en(en_msg, en_msg_len, dev_batch,
+            results, _ = model.get_grounding(en_msg, en_msg_len, dev_batch,
                                              en_lm=extra_input["en_lm"],
                                              all_img=extra_input["img"]['multi30k'][1],
                                              ranker=extra_input["ranker"])

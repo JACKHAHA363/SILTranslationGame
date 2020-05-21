@@ -86,7 +86,7 @@ def save_dict_to_json(d, json_path):
 
 def _sil_str(args):
     hp_str = "sameopt_{}_endefinetune{}_".format(args.same_opt, args.en_de_finetune) + \
-             "sils2p{}_frenreset{}_".format(args.sil_s2p_ratio, args.fr_en_reset) + \
+             "sils2p{}_".format(args.sil_s2p_ratio) + \
              "k1{}_".format(args.k1) + \
              "fren_k2{}_temp{}_lr{}_".format(args.fr_en_k2, args.fr_en_temp, args.fr_en_lr) + \
              "ende_k2{}_temp{}_lr{}_".format(args.en_de_k2, args.en_de_temp, args.en_de_lr) + \

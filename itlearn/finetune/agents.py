@@ -75,9 +75,9 @@ class BaseAgents(ArgsModule):
 
         return en_msgs, de_msg
 
-    def forward_fr_en(self, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
+    def get_grounding(self, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
                       use_gumbel_tokens=False):
-        """ Forward speaker with English sentence to get loss and rewards """
+        """ Forward speaker with English sentence to get grounding loss and rewards """
         results = {}
         rewards = {}
         batch_size = en_msg.shape[0]
@@ -181,10 +181,10 @@ class AgentsA2C(BaseAgents):
 
         # Speak fr en first
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, fr_en_rewards = self.forward_fr_en(en_msg, en_msg_len, batch, en_lm=en_lm,
-                                                          all_img=all_img, ranker=ranker)
-        results.update(fr_en_results)
-        rewards.update(fr_en_rewards)
+        grounding_results, grounding_rewards = self.get_grounding(en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                                  all_img=all_img, ranker=ranker)
+        results.update(grounding_results)
+        rewards.update(grounding_rewards)
 
         # Speak De and get reward
         (de, de_len) = batch.de
@@ -251,9 +251,9 @@ class AgentsGumbel(BaseAgents):
         """ Create training graph """
         results = {}
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, _ = self.forward_fr_en(en_msg, en_msg_len, batch, en_lm=en_lm,
-                                              all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
-        results.update(fr_en_results)
+        grounding_results, _ = self.get_grounding(en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                  all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
+        results.update(grounding_results)
 
         (de, de_len) = batch.de
         de_input, de_target = de[:, :-1], de[:, 1:].contiguous().view(-1)

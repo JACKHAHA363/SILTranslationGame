@@ -54,7 +54,7 @@ class SILTrainer(Trainer):
 
     def _get_student_opts(self):
         # Same opt
-        if self.args.same_opt and self.stu_opts[0] is not None and self.stu_opts[1] is not None:
+        if self.args.same_opt and self.stu_fr_en_opt is not None and self.stu_en_de_opt is not None:
             self.args.logger.info('Reuse optimizer!')
 
         # Create

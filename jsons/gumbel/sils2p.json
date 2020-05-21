@@ -59,7 +59,6 @@
     "same_opt": true,
     "en_de_finetune": true,
     "sil_s2p_ratio": 0,
-    "fr_en_reset": true,
     "k1": 4000,
     "fr_en_k2": 400,
     "fr_en_temp": 0,
