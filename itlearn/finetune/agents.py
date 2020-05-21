@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from itlearn.models.agent import RNNAttn
-from itlearn.finetune.agents_utils import eval_fr_en_stats
+from itlearn.finetune.agents_utils import forward_fr_en
 from itlearn.utils.misc import cuda, xlen_to_inv_mask
 from itlearn.models.modules import ArgsModule
 
@@ -105,8 +105,8 @@ class AgentsA2C(BaseAgents):
 
         # Speak fr en first
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, fr_en_rewards = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
-                                                        all_img=all_img, ranker=ranker)
+        fr_en_results, fr_en_rewards = forward_fr_en(self, en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                     all_img=all_img, ranker=ranker)
         results.update(fr_en_results)
         rewards.update(fr_en_rewards)
 
@@ -175,8 +175,8 @@ class AgentsGumbel(BaseAgents):
         """ Create training graph """
         results = {}
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, _ = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
-                                            all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
+        fr_en_results, _ = forward_fr_en(self, en_msg, en_msg_len, batch, en_lm=en_lm,
+                                         all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
         results.update(fr_en_results)
 
         (de, de_len) = batch.de

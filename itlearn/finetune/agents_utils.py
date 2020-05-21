@@ -8,7 +8,7 @@ from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.misc import cuda, sum_reward
 
 
-def _supervise_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
+def supervise_evaluate_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
     dev_metrics = Metrics('s2p_dev', ['nll'])
     with torch.no_grad():
         agent.eval()
@@ -35,8 +35,8 @@ def _supervise_loop(agent, dev_it, dataset='iwslt', pair='fr_en'):
     return dev_metrics, bleu
 
 
-def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
-                     use_gumbel_tokens=False):
+def forward_fr_en(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
+                  use_gumbel_tokens=False):
     """ Evaluate this eng sentence with different metric. Can be used as reward """
     results = {}
     rewards = {}
@@ -112,54 +112,3 @@ def eval_fr_en_stats(model, en_msg, en_msg_len, batch, en_lm=None, all_img=None,
             results['r1_acc'] = r1_acc
     return results, rewards
 
-
-def eval_model(args, model, dev_it, monitor_names, extra_input):
-    """ Use greedy decoding and check scores like BLEU, language model and grounding """
-    eval_metrics = Metrics('dev_loss', *monitor_names, data_type="avg")
-    eval_metrics.reset()
-    with torch.no_grad():
-        unbpe = True
-        model.eval()
-        en_corpus, de_corpus = [], []
-        en_hyp, de_hyp = [], []
-
-        for j, dev_batch in enumerate(dev_it):
-            en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
-            de_corpus.extend(args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
-
-            en_msg, de_msg, en_msg_len, _ = model.decode(dev_batch)
-            en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
-            de_hyp.extend(args.DE.reverse(de_msg, unbpe=unbpe))
-            results, _ = eval_fr_en_stats(model, en_msg, en_msg_len, dev_batch,
-                                          en_lm=extra_input["en_lm"],
-                                          all_img=extra_input["img"]['multi30k'][1],
-                                          ranker=extra_input["ranker"])
-            if len(monitor_names) > 0:
-                eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
-
-            if args.debug:
-                break
-
-        bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
-        bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
-        args.logger.info(eval_metrics)
-        args.logger.info("Fr-En {} : {}".format('valid', print_bleu(bleu_en)))
-        args.logger.info("En-De {} : {}".format('valid', print_bleu(bleu_de)))
-        return eval_metrics, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp
-
-
-def valid_model(model, dev_it, loss_names, monitor_names, extra_input):
-    """ Run reinforce on validation and record stats """
-    dev_metrics = Metrics('dev_loss', *loss_names, *monitor_names, data_type="avg")
-    dev_metrics.reset()
-    with torch.no_grad():
-        model.eval()
-        for j, dev_batch in enumerate(dev_it):
-            R = model(dev_batch, en_lm=extra_input["en_lm"], all_img=extra_input["img"]['multi30k'][1],
-                      ranker=extra_input["ranker"])
-            losses = [R[key] for key in loss_names]
-            dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
-                                   *[R[k].item() for k in monitor_names])
-            if model.debug:
-                break
-    return dev_metrics

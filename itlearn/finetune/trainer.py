@@ -8,8 +8,9 @@ import numpy as np
 import torch
 import time
 
+from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.metrics import Metrics, Best
-from itlearn.finetune.agents_utils import valid_model, eval_model
+from itlearn.finetune.agents_utils import forward_fr_en
 from itlearn.utils.misc import write_tb
 from itlearn.finetune.agents import AgentsA2C, AgentsGumbel
 
@@ -123,7 +124,7 @@ class Trainer:
 
                 if iters % self.args.eval_every == 0:
                     self.model.eval()
-                    self.eval_loop(iters, best)
+                    self.evaluate(iters, best)
 
                 self.model.train()
                 self.train_step(iters, train_batch)
@@ -159,15 +160,6 @@ class Trainer:
                       'opt': self.opt.state_dict()}
             torch.save(status, '{}_latest.pt'.format(self.args.model_path + self.args.id_str))
 
-    def _maybe_save(self, iters):
-        if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
-            self.args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
-            with torch.cuda.device(self.args.gpu):
-                torch.save(self.model.state_dict(), '{}_iter={}.pt'.format(self.args.model_path + self.args.id_str,
-                                                                           iters))
-                torch.save([iters, self.opt.state_dict()],
-                           '{}_iter={}.pt.states'.format(self.args.model_path + self.args.id_str, iters))
-
     def selfplay_step(self, iters, train_batch):
         """ Perform a step of selfplay """
         if hasattr(self.args, 'lr_anneal') and self.args.lr_anneal == "linear":
@@ -200,10 +192,55 @@ class Trainer:
                 exit()
         self.opt.step()
 
-    def eval_loop(self, iters, best):
-        dev_metrics = valid_model(self.model, self.dev_it, self.loss_names, self.monitor_names, self.extra_input)
-        eval_metric, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp = eval_model(self.args, self.model, self.dev_it,
-                                                                              self.monitor_names, self.extra_input)
+    def evaluate_communication(self):
+        """ Use greedy decoding and check scores like BLEU, language model and grounding """
+        eval_metrics = Metrics('dev_loss', *self.monitor_names, data_type="avg")
+        eval_metrics.reset()
+        with torch.no_grad():
+            unbpe = True
+            self.model.eval()
+            en_corpus, de_corpus = [], []
+            en_hyp, de_hyp = [], []
+
+            for j, dev_batch in enumerate(self.dev_it):
+                en_corpus.extend(self.args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
+                de_corpus.extend(self.args.DE.reverse(dev_batch.de[0], unbpe=unbpe))
+
+                en_msg, de_msg, en_msg_len, _ = self.model.decode(dev_batch)
+                en_hyp.extend(self.args.EN.reverse(en_msg, unbpe=unbpe))
+                de_hyp.extend(self.args.DE.reverse(de_msg, unbpe=unbpe))
+                results, _ = forward_fr_en(self.model, en_msg, en_msg_len, dev_batch,
+                                           en_lm=self.extra_input["en_lm"],
+                                           all_img=self.extra_input["img"]['multi30k'][1],
+                                           ranker=self.extra_input["ranker"])
+                if len(self.monitor_names) > 0:
+                    eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in self.monitor_names])
+
+            bleu_en = computeBLEU(en_hyp, en_corpus, corpus=True)
+            bleu_de = computeBLEU(de_hyp, de_corpus, corpus=True)
+            self.args.logger.info(eval_metrics)
+            self.args.logger.info("Fr-En {} : {}".format('valid', print_bleu(bleu_en)))
+            self.args.logger.info("En-De {} : {}".format('valid', print_bleu(bleu_de)))
+            return eval_metrics, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp
+
+    def valid_model(self):
+        """ Run reinforce on validation and record stats """
+        dev_metrics = Metrics('dev_loss', *self.loss_names, *self.monitor_names, data_type="avg")
+        dev_metrics.reset()
+        with torch.no_grad():
+            self.model.eval()
+            for j, dev_batch in enumerate(self.dev_it):
+                R = self.model(dev_batch, en_lm=self.extra_input["en_lm"],
+                               all_img=self.extra_input["img"]['multi30k'][1],
+                               ranker=self.extra_input["ranker"])
+                losses = [R[key] for key in self.loss_names]
+                dev_metrics.accumulate(len(dev_batch), *[loss.item() for loss in losses],
+                                       *[R[k].item() for k in self.monitor_names])
+        return dev_metrics
+
+    def evaluate(self, iters, best):
+        dev_metrics = self.valid_model()
+        eval_metric, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp = self.evaluate_communication()
         write_tb(self.writer, self.loss_names, [dev_metrics.__getattr__(name) for name in self.loss_names],
                  iters, prefix="dev/")
         write_tb(self.writer, self.monitor_names, [dev_metrics.__getattr__(name) for name in self.monitor_names],
@@ -224,6 +261,15 @@ class Trainer:
                         ["en_ref", "de_hyp_{}".format(iters), "en_hyp_{}".format(iters)]]
         for (dest, string) in zip(dest_folders, [en_corpus, de_hyp, en_hyp]):
             dest.write_text("\n".join(string), encoding="utf-8")
+
+    def _maybe_save(self, iters):
+        if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
+            self.args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
+            with torch.cuda.device(self.args.gpu):
+                torch.save(self.model.state_dict(), '{}_iter={}.pt'.format(self.args.model_path + self.args.id_str,
+                                                                           iters))
+                torch.save([iters, self.opt.state_dict()],
+                           '{}_iter={}.pt.states'.format(self.args.model_path + self.args.id_str, iters))
 
     def _get_lr_anneal(self, iters):
         lr_end = self.args.lr_min
