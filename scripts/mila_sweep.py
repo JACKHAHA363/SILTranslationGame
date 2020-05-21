@@ -10,7 +10,7 @@ import sys
 from subprocess import call
 
 PROJ_PATH = os.path.dirname(itlearn.__file__)
-SCRIPT_PATH = os.path.join(PROJ_PATH, 'train.py')
+SCRIPT_PATH = os.path.join(PROJ_PATH, 'run_finetune.py')
 PYBIN = sys.executable
 SLURM_FILE = os.path.join(os.path.dirname(PROJ_PATH), 'scripts', 'run_mila.sh')
 print('train_script', SCRIPT_PATH)
@@ -27,6 +27,7 @@ def get_args():
     parser.add_argument('--exp_dir', required=True)
     parser.add_argument('--sweep', required=True, help='path to json of sweep')
     parser.add_argument('--test', action='store_true', help='not calling just printing')
+    parser.add_argument('--no_slurm', action='store_true')
     return parser.parse_args()
 
 
@@ -50,7 +51,10 @@ def main():
         non_fixed = []
         for k, val in zip(sweep_keys, sweep_args):
             non_fixed += ['--{}'.format(k), str(val)]
-        final_cmd = SLURM_OPTION + cmd + non_fixed
+        if args.no_slurm:
+            final_cmd = cmd + non_fixed
+        else:
+            final_cmd = SLURM_OPTION + cmd + non_fixed
         print(final_cmd)
         if not args.test:
             call(final_cmd)
