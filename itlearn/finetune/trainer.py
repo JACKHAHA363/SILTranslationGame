@@ -260,6 +260,7 @@ class Trainer:
     def _plot_grad(self, iters):
         """ plot the gradients for selfplau and supervise """
         assert self.use_s2p
+        self.model.train()
         self.args.logger.info('Plotting Gradients...')
         grads = {'sp': {}, 'su': {}}
         self.opt.zero_grad()
@@ -316,6 +317,10 @@ class Trainer:
             self.writer.add_scalar("grad/norm/sp_{}".format(agent), sp_grad_norm.item(), global_step=iters)
             self.writer.add_scalar("grad/norm/su_{}".format(agent), su_grad_norm.item(), global_step=iters)
             self.writer.add_scalar("grad/cosine/{}".format(agent), cosine.item(), global_step=iters)
+            self.args.logger.info('[{}] sp norm: {:.4f} su norm: {:.4f} cosine: {:.4f}'.format(agent,
+                                                                                               sp_grad_norm.item(),
+                                                                                               su_grad_norm.item(),
+                                                                                               cosine.item()))
 
     def _s2p_batch(self):
         fr_en_batch = self.s2p_fr_en_it.__next__()
