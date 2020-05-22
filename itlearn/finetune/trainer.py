@@ -143,6 +143,8 @@ class Trainer:
         except (InterruptedError, KeyboardInterrupt):
             # End Gracefully
             self.end_gracefully(iters)
+        self.writer.flush()
+        self.writer.close()
 
     def train_step(self, iters, train_batch, train_metrics):
         """ Perform a step of selfplay as well as supervise loss if necessary """
@@ -178,8 +180,6 @@ class Trainer:
 
     def end_gracefully(self, iters):
         self.args.logger.info('Interrupted! save (back-up) checkpoints at iters={}'.format(iters))
-        self.writer.flush()
-        self.writer.close()
         with torch.cuda.device(self.args.gpu):
             status = {'iters': iters,
                       'model': self.model.state_dict(),
