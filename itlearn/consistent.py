@@ -10,7 +10,6 @@ from run_utils import get_model, get_data, get_ckpt_paths
 from models.agent import ImageCaptioning, RNNLM, ImageGrounding
 from utils.hyperparams import Params
 from utils.metrics import Metrics
-from finetune.agents_utils import eval_fr_en_stats
 from utils.bleu import computeBLEU
 import random
 
@@ -97,10 +96,10 @@ def get_fr_en_stats(args, model, dev_it, monitor_names, extra_input):
             en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
             en_msg, en_msg_len = model.fr_en_speak(dev_batch, is_training=False)
             en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
-            results, _ = eval_fr_en_stats(model, en_msg, en_msg_len, dev_batch,
-                                          en_lm=extra_input["en_lm"],
-                                          all_img=extra_input["img"]['multi30k'][1],
-                                          ranker=extra_input["ranker"])
+            results, _ = model.get_grounding(en_msg, en_msg_len, dev_batch,
+                                             en_lm=extra_input["en_lm"],
+                                             all_img=extra_input["img"]['multi30k'][1],
+                                             ranker=extra_input["ranker"])
             if len(monitor_names) > 0:
                 eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
 
@@ -129,7 +128,6 @@ def main_loop(args, err_type):
 
     # Opt
     fr_en_opt = torch.optim.Adam(model.fr_en.parameters(), lr=args.fr_en_lr)
-    monitor_names = ['nll_real']
     monitor_names.extend(["img_pred_loss_{}".format(args.img_pred_loss)])
     monitor_names.extend(["r1_acc"])
     monitor_names.append('en_nll_lm')

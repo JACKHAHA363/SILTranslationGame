@@ -1,8 +1,6 @@
 import torch
 from torch.nn import functional as F
-import random
 
-from itlearn.finetune.agents_utils import eval_fr_en_stats
 from itlearn.utils.metrics import Metrics
 from itlearn.utils.bleu import computeBLEU
 from itlearn.utils.misc import cuda
@@ -258,12 +256,16 @@ def get_fr_en_imitate_stats(args, model, dev_it, monitor_names, extra_input):
             en_corpus.extend(args.EN.reverse(dev_batch.en[0], unbpe=unbpe))
             en_msg, en_msg_len = model.fr_en_speak(dev_batch, is_training=False)
             en_hyp.extend(args.EN.reverse(en_msg, unbpe=unbpe))
-            results, _ = eval_fr_en_stats(model, en_msg, en_msg_len, dev_batch,
-                                          en_lm=extra_input["en_lm"],
-                                          all_img=extra_input["img"]['multi30k'][1],
-                                          ranker=extra_input["ranker"])
+            results, _ = model.get_grounding(en_msg, en_msg_len, dev_batch,
+                                             en_lm=extra_input["en_lm"],
+                                             all_img=extra_input["img"]['multi30k'][1],
+                                             ranker=extra_input["ranker"])
+            # Get entropy
+            neg_Hs = model.fr_en.dec.neg_Hs  # (batch_size, en_msg_len)
+            neg_Hs = neg_Hs.mean()  # (1,)
+            results["neg_Hs"] = neg_Hs
             if len(monitor_names) > 0:
-                eval_metrics.accumulate(len(dev_batch), *[results[k].item() for k in monitor_names])
+                eval_metrics.accumulate(len(dev_batch), **results)
             if args.debug:
                 break
 

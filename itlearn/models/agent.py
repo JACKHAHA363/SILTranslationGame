@@ -78,7 +78,6 @@ class ImageGrounding(ArgsModule):
         nn.init.xavier_uniform_(self.img_enc.weight.data, gain=nn.init.calculate_gain('linear'))
         nn.init.constant_(self.img_enc.bias.data, 0)
         nn.init.uniform_(self.emb.weight.data, -0.1, 0.1)
-        print("Initialised!")
 
     def forward(self, x, x_len, img):
         # x : (batch_size, seq_len)

@@ -5,11 +5,9 @@ import os
 
 
 def get_model(args):
-    if args.setup == "joint":
+    if args.setup == "a2c" or args.setup == 'a2c_sil':
         model = AgentsA2C(args)
-    elif args.setup == 'itlearn':
-        model = AgentsA2C(args)
-    elif args.setup == 'gumbel' or args.setup == 'gumbel_itlearn':
+    elif args.setup == 'gumbel' or args.setup == 'gumbel_sil':
         model = AgentsGumbel(args)
     elif args.setup == "single":
         model = RNNAttn(args, args.voc_sz_src, args.voc_sz_trg)

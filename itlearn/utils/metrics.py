@@ -10,15 +10,14 @@ class Metrics:
         self.name = name
         self.data_type = data_type
 
-    def accumulate(self, count, *values):
+    def accumulate(self, count, **kwargs):
         self.count += count
-        for value, metric in zip(values, self.metrics):
+        for metric in self.metrics:
+            value = kwargs[metric].item()
             if self.data_type == "sum":
                 self.metrics[metric] += value
             elif self.data_type == "avg":
                 self.metrics[metric] += value * count
-
-        return values[0] # loss
 
     def __getattr__(self, key):
         if key in self.metrics:

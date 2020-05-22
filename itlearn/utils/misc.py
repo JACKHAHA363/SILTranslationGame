@@ -24,8 +24,8 @@ try:
 except TypeError:
     from nltk.compat import Fraction
 
-def write_tb(writer, keys, values, idx, prefix=""):
-    for k, v in zip(keys, values):
+def write_tb(writer, stats, idx, prefix=""):
+    for k, v in stats.items():
         writer.add_scalar(prefix+k, v, idx)
 
 def plot_grad(writer, model, idx):

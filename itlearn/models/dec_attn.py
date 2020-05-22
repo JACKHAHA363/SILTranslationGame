@@ -166,6 +166,8 @@ class RNNDecAttn(ArgsModule):
 
             if send_method == "argmax":
                 tokens = logit.max(dim=1)[1] # (batch_size)
+                tok_dist = Categorical(logits=logit)
+                self.neg_Hs.append(-1 * tok_dist.entropy())
 
             elif send_method == "reinforce":
                 tok_dist = Categorical(logits=logit)
@@ -196,14 +198,13 @@ class RNNDecAttn(ArgsModule):
             y_emb = self.emb(tokens) # (batch_size, D_emb)
 
         msg = torch.stack(msg, dim=1) # (batch_size, y_seq_len)
+        self.neg_Hs = torch.stack(self.neg_Hs, dim=1)  # (batch_size, y_seq_len)
         if send_method == "reinforce":
             self.log_probs = torch.stack(self.log_probs, dim=1) # (batch_size, y_seq_len)
             self.R_b = torch.stack(self.R_b, dim=1) if value_fn else self.R_b # (batch_size, y_seq_len)
-            self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
         if send_method == 'gumbel' and len(self.gumbel_tokens) > 0:
             self.gumbel_tokens = torch.stack(self.gumbel_tokens, dim=1)
-            self.neg_Hs = torch.stack(self.neg_Hs, dim=1) # (batch_size, y_seq_len)
 
         result = {"msg": msg.clone(), "new_seq_lens": seq_lens.clone()}
 

@@ -10,9 +10,7 @@ from utils.misc import set_seed, get_logger
 from models.agent import ImageCaptioning, RNNLM, ImageGrounding
 from utils.hyperparams import Params, get_hp_str
 from data import get_s2p_dataset
-from finetune.agents_utils import train_a2c_model, train_gumbel_model
-from finetune.train_joint import joint_loop
-from finetune.train_iterlearn import itlearn_loop
+from finetune import SILTrainer, Trainer
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,12 +34,8 @@ if not hasattr(args, 'data_dir'):
 args.exp_dir = os.path.abspath(args.exp_dir)
 main_path = args.exp_dir
 
-JOINT_SETUPS = ['joint', 'itlearn', 'gumbel', 'gumbel_itlearn']
-folders = ["event", "model", "log", "param"]
-if args.setup in ['single'] + JOINT_SETUPS:
-    folders.append('decoding')
-if 'itlearn' in args.setup:
-    folders.append('misc')
+assert args.setup in ['gumbel', 'gumbel_sil', 'a2c', 'a2c_sil']
+folders = ["event", "model", "log", "param", "decoding", "misc"]
 
 for name in folders:
     folder = "{}/{}/".format(name, args.experiment) if hasattr(args, "experiment") else name + '/'
@@ -62,7 +56,6 @@ args.save((str(args.param_path + args.id_str)))
 train_it, dev_it = get_data(args)
 
 args.__dict__.update({'logger': logger})
-args.logger.info(args)
 args.logger.info('Starting with HPARAMS: {}'.format(args.hp_str))
 
 # Model
@@ -82,7 +75,7 @@ if os.path.exists(resume_path):
 
 # Loading EN LM
 extra_input.update({"en_lm": None, "img": {"multi30k": [None, None]}, "ranker": None, "s2p_it": None})
-if args.setup in JOINT_SETUPS and args.use_en_lm:
+if args.use_en_lm:
     lm_param, lm_model = get_ckpt_paths(args.exp_dir, args.lm_ckpt)
     args.logger.info("Loading LM from: " + lm_param)
     args_ = Params(lm_param)
@@ -94,7 +87,7 @@ if args.setup in JOINT_SETUPS and args.use_en_lm:
         en_lm.cuda(args.gpu)
     extra_input["en_lm"] = en_lm
 
-if (args.setup in JOINT_SETUPS) and args.use_ranker:
+if args.use_ranker:
     ranker_param, ranker_model = get_ckpt_paths(args.exp_dir, args.ranker_ckpt)
     args.logger.info("Loading ranker from: " + ranker_param)
     args_ = Params(ranker_param)
@@ -118,70 +111,34 @@ if (args.setup in JOINT_SETUPS) and args.use_ranker:
     extra_input["img"] = img
 
 # Get iwslt its for s2p
-if args.setup in JOINT_SETUPS:
-     extra_input['s2p_its'] = get_s2p_dataset(args)
+extra_input['s2p_its'] = get_s2p_dataset(args)
 
 
 # Loading checkpoints pretrained on IWSLT
-if args.setup in JOINT_SETUPS and hasattr(model, 'fr_en') and hasattr(model, 'en_de'):
-    if hasattr(args, 'en_de_ckpt') and args.en_de_ckpt is not None:
-        _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
-        model.en_de.load_state_dict(torch.load(en_de_model, map_location))
-        args.logger.info("Loading En -> De checkpoint : {}".format(en_de_model))
+if hasattr(args, 'en_de_ckpt') and args.en_de_ckpt is not None:
+    _, en_de_model = get_ckpt_paths(args.exp_dir, args.en_de_ckpt, args.cpt_iter)
+    model.en_de.load_state_dict(torch.load(en_de_model, map_location))
+    args.logger.info("Loading En -> De checkpoint : {}".format(en_de_model))
 
-    if hasattr(args, 'fr_en_ckpt') and args.fr_en_ckpt is not None:
-        _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
-        model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
-        args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
-        if args.fix_fr2en:
-            for param in list(model.fr_en.parameters()):
-                param.requires_grad = False
-            args.logger.info("Fixed FR->EN agent")
-
-
-args.logger.info(str(model))
-
-# Params
-params, param_names = [], []
-for name, param in model.named_parameters():
-    params.append(param)
-    param_names.append(name)
-    args.logger.info("{} {} {}".format(name, param.size(), "-----FIXED-----" if not param.requires_grad else ""))
-
-args.logger.info("Model size {:,}".format( sum( [ np.prod(x.size()) for x in params ] )) )
+if hasattr(args, 'fr_en_ckpt') and args.fr_en_ckpt is not None:
+    _, fr_en_model = get_ckpt_paths(args.exp_dir, args.fr_en_ckpt, args.cpt_iter)
+    model.fr_en.load_state_dict(torch.load(fr_en_model, map_location))
+    args.logger.info("Loading Fr -> En checkpoint : {}".format(fr_en_model))
+    if args.fix_fr2en:
+        for param in list(model.fr_en.parameters()):
+            param.requires_grad = False
+        args.logger.info("Fixed FR->EN agent")
 
 if torch.cuda.device_count() > 0 and args.gpu > -1:
     model.cuda(args.gpu)
 
 # Main
-if args.setup == "single":
-    from pretrain.train_single import train_model
-    train_model(args, model, (train_it, dev_it))
+if args.setup == "a2c" or args.setup == 'gumbel':
+    trainer = Trainer(args, model, train_it, dev_it, extra_input)
 
-elif args.setup == "ranker":
-    if args.img_pred_loss == "nll":
-        from pretrain.train_captioner import train_model
-        train_model(args, model, (train_it, dev_it), extra_input)
-    elif args.img_pred_loss in ["vse", "mse"]:
-        from pretrain.train_raw_ranker import train_model
-        train_model(args, model)
-
-elif args.setup == "lm":
-    from pretrain.train_lm import train_model
-    train_model(args, model, (train_it, dev_it))
-
-elif args.setup == "joint":
-    train_a2c_model(args, model, (train_it, dev_it), extra_input, joint_loop)
-
-elif args.setup == 'itlearn':
-    train_a2c_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
-
-elif args.setup == 'gumbel':
-    train_gumbel_model(args, model, (train_it, dev_it), extra_input, joint_loop)
-
-elif args.setup == 'gumbel_itlearn':
-    train_gumbel_model(args, model, (train_it, dev_it), extra_input, itlearn_loop)
+elif args.setup == 'a2c_sil' or args.setup == 'gumbel_sil':
+    trainer = SILTrainer(args, model, train_it, dev_it, extra_input)
 else:
     raise ValueError
-
+trainer.start()
 args.logger.info("done.")

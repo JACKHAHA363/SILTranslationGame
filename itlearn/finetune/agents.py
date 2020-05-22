@@ -4,8 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from itlearn.models.agent import RNNAttn
-from itlearn.finetune.agents_utils import eval_fr_en_stats
-from itlearn.utils.misc import cuda, xlen_to_inv_mask
+from itlearn.utils.misc import cuda, xlen_to_inv_mask, sum_reward
 from itlearn.models.modules import ArgsModule
 
 
@@ -76,6 +75,83 @@ class BaseAgents(ArgsModule):
 
         return en_msgs, de_msg
 
+    def get_grounding(self, en_msg, en_msg_len, batch, en_lm=None, all_img=None, ranker=None,
+                      use_gumbel_tokens=False):
+        """ Forward speaker with English sentence to get grounding loss and rewards """
+        results = {}
+        rewards = {}
+        batch_size = en_msg.shape[0]
+        # NOTE add <BOS> to beginning
+        en_msg_ = torch.cat([cuda(torch.full((batch_size, 1), self.init_token)).long(), en_msg], dim=1)
+        gumbel_tokens = None
+        if use_gumbel_tokens:
+            gumbel_tokens = self.fr_en.dec.gumbel_tokens
+            init_tokens = torch.zeros([gumbel_tokens.shape[0], 1, gumbel_tokens.shape[2]])
+            init_tokens = init_tokens.to(device=gumbel_tokens.device)
+            init_tokens[:, :, self.init_token] = 1
+            gumbel_tokens = torch.cat([init_tokens, gumbel_tokens], dim=1)
+
+        if self.use_en_lm:  # monitor EN LM NLL
+            if "wiki" in self.en_lm_dataset:
+                if use_gumbel_tokens:
+                    raise NotImplementedError
+                en_nll_lm = en_lm.get_nll(en_msg_)  # (batch_size, en_msg_len)
+                if self.train_en_lm:
+                    en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
+                    rewards['lm'] = -1 * en_nll_lm.detach()
+                    # R = R + -1 * en_nll_lm.detach() * self.en_lm_nll_co # (batch_size)
+                results.update({"en_nll_lm": en_nll_lm.mean()})
+
+            elif self.en_lm_dataset in ["coco", "multi30k"]:
+                if use_gumbel_tokens:
+                    en_lm.train()
+                    en_nll_lm = en_lm.get_loss_oh(gumbel_tokens, None)
+                    en_lm.eval()
+                else:
+                    en_nll_lm = en_lm.get_loss(en_msg_, None)  # (batch_size, en_msg_len)
+                if self.train_en_lm:
+                    en_nll_lm = sum_reward(en_nll_lm, en_msg_len + 1)  # (batch_size)
+                    rewards['lm'] = -1 * en_nll_lm.detach()
+                results.update({"en_nll_lm": en_nll_lm.mean()})
+            else:
+                raise Exception()
+
+        if self.use_ranker:  # NOTE Experiment 3 : Reward = NLL_DE + NLL_EN_LM + NLL_IMG_PRED
+            if use_gumbel_tokens and self.train_ranker:
+                raise NotImplementedError
+            ranker.eval()
+            img = cuda(all_img.index_select(dim=0, index=batch.idx.cpu()))  # (batch_size, D_img)
+
+            if self.img_pred_loss == "nll":
+                img_pred_loss = ranker.get_loss(en_msg_, img)  # (batch_size, en_msg_len)
+                img_pred_loss = sum_reward(img_pred_loss, en_msg_len + 1)  # (batch_size)
+            else:
+                with torch.no_grad():
+                    img_pred_loss = ranker(en_msg, en_msg_len, img)["loss"]
+
+            if self.train_ranker:
+                rewards['img_pred'] = -1 * img_pred_loss.detach()
+            results.update({"img_pred_loss_{}".format(self.img_pred_loss): img_pred_loss.mean()})
+
+            # Get ranker retrieval result
+            with torch.no_grad():
+                K = 19
+                # Randomly select K distractor image
+                random_idx = torch.randint(all_img.shape[0], size=[batch_size, K])
+                wrong_img = cuda(all_img.index_select(dim=0, index=random_idx.view(-1)))
+                wrong_img_feat = ranker.batch_enc_img(wrong_img).view(batch_size, K, -1)
+                right_img_feat = ranker.batch_enc_img(img)
+
+                # [bsz, K+1, hid_size]
+                all_feat = torch.cat([right_img_feat.unsqueeze(1), wrong_img_feat], dim=1)
+
+                # [bsz, hid_size]
+                cap_feats = ranker.batch_cap_rep(en_msg, en_msg_len)
+                scores = (cap_feats.unsqueeze(1) * all_feat).sum(-1)
+                r1_acc = (torch.argmax(scores, -1) == 0).float().mean()
+                results['r1_acc'] = r1_acc
+        return results, rewards
+
 
 class AgentsA2C(BaseAgents):
     def __init__(self, args):
@@ -105,10 +181,10 @@ class AgentsA2C(BaseAgents):
 
         # Speak fr en first
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, fr_en_rewards = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
-                                                        all_img=all_img, ranker=ranker)
-        results.update(fr_en_results)
-        rewards.update(fr_en_rewards)
+        grounding_results, grounding_rewards = self.get_grounding(en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                                  all_img=all_img, ranker=ranker)
+        results.update(grounding_results)
+        rewards.update(grounding_rewards)
 
         # Speak De and get reward
         (de, de_len) = batch.de
@@ -175,9 +251,9 @@ class AgentsGumbel(BaseAgents):
         """ Create training graph """
         results = {}
         en_msg, en_msg_len = self.fr_en_speak(batch, is_training=True)
-        fr_en_results, _ = eval_fr_en_stats(self, en_msg, en_msg_len, batch, en_lm=en_lm,
-                                            all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
-        results.update(fr_en_results)
+        grounding_results, _ = self.get_grounding(en_msg, en_msg_len, batch, en_lm=en_lm,
+                                                  all_img=all_img, ranker=ranker, use_gumbel_tokens=self.training)
+        results.update(grounding_results)
 
         (de, de_len) = batch.de
         de_input, de_target = de[:, :-1], de[:, 1:].contiguous().view(-1)
