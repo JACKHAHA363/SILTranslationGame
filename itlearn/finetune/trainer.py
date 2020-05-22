@@ -10,6 +10,7 @@ import torch
 from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.metrics import Metrics, Best
 from itlearn.utils.misc import write_tb
+from itlearn.finetune.agents_utils import supervise_evaluate_loop
 
 
 def _get_nll(model, src, src_len, trg):
@@ -122,6 +123,7 @@ class Trainer:
                 if iters % self.args.eval_every == 0:
                     self.model.eval()
                     self.evaluate(iters, best)
+                    self.supervise_evaluate(iters)
                     if self.args.plot_grad:
                         self._plot_grad(iters)
 
@@ -237,6 +239,29 @@ class Trainer:
                         ["en_ref", "de_hyp_{}".format(iters), "en_hyp_{}".format(iters)]]
         for (dest, string) in zip(dest_folders, [en_corpus, de_hyp, en_hyp]):
             dest.write_text("\n".join(string), encoding="utf-8")
+
+    def supervise_evaluate(self, iters):
+        """ Perform several teacher forcing loop """
+        agents = ['fren', 'ende']
+        datasets = ['iwslt', 'multi30k']
+        results = {agent: {dset: None for dset in datasets} for agent in agents}
+        dev_its = {'fren': {'iwslt': self.extra_input['s2p_its']['fr_en'][1],
+                            'multi30k': self.dev_it},
+                   'ende':{'iwslt': self.extra_input['s2p_its']['en_de'][1],
+                           'multi30k': self.dev_it}}
+        for agent in agents:
+            if agent == 'fren':
+                pair = "fr_en"
+                model = self.model.fr_en
+            else:
+                pair = "en_de"
+                model = self.model.en_de
+            for dset in datasets:
+                dev_it = dev_its[agent][dset]
+                dev_metrics, bleu = supervise_evaluate_loop(model, dev_it, dset, pair)
+
+                # Write result
+                import ipdb; ipdb.set_trace()
 
     def _maybe_save(self, iters):
         if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
