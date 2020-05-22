@@ -242,9 +242,9 @@ class Trainer:
 
     def supervise_evaluate(self, iters):
         """ Perform several teacher forcing loop """
+        assert self.use_s2p
         agents = ['fren', 'ende']
         datasets = ['iwslt', 'multi30k']
-        results = {agent: {dset: None for dset in datasets} for agent in agents}
         dev_its = {'fren': {'iwslt': self.extra_input['s2p_its']['fr_en'][1],
                             'multi30k': self.dev_it},
                    'ende':{'iwslt': self.extra_input['s2p_its']['en_de'][1],
@@ -259,9 +259,12 @@ class Trainer:
             for dset in datasets:
                 dev_it = dev_its[agent][dset]
                 dev_metrics, bleu = supervise_evaluate_loop(model, dev_it, dset, pair)
-
-                # Write result
-                import ipdb; ipdb.set_trace()
+                stats = {'nll': dev_metrics.nll, 'bleu': bleu[0], 'lengths': bleu[-1]}
+                logger_str = ["[{}|{}]".format(agent, dset)]
+                for key, val in stats.items():
+                    logger_str += ["{}: {:.4f}".format(key, val)]
+                    self.writer.add_scalar('supervise/{}/{}/{}'.format(agent, dset, key), val, global_step=iters)
+                self.args.logger.info(' '.join(logger_str))
 
     def _maybe_save(self, iters):
         if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
