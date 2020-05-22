@@ -224,9 +224,9 @@ class Trainer:
     def evaluate(self, iters, best):
         """ Free Run """
         eval_metric, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp = self.evaluate_communication()
-        bleu_names = ['bleu', "p_1", "p_2", "p_3", "p_4", 'bp', 'len_ref', 'len_hyp']
-        write_tb(self.writer, {name: val for name, val in zip(bleu_names, bleu_en)}, iters, prefix='bleu_en/')
-        write_tb(self.writer, {name: val for name, val in zip(bleu_names, bleu_de)}, iters, prefix='bleu_de/')
+        bleu_names = ['bleu', 'len_hyp']
+        write_tb(self.writer, {'bleu': bleu_en[0], 'len_hyp': bleu_en[-1]}, iters, prefix='bleu_en/')
+        write_tb(self.writer, {'bleu': bleu_de[0], 'len_hyp': bleu_de[-1]}, iters, prefix='bleu_de/')
         write_tb(self.writer, {"bleu_en": bleu_en[0], "bleu_de": bleu_de[0]}, iters, prefix="eval/")
         write_tb(self.writer, {name: eval_metric.__getattr__(name) for name in self.monitor_names},
                  iters, prefix="eval/")
