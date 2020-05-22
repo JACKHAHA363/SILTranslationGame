@@ -10,6 +10,7 @@ import torch
 from itlearn.utils.bleu import computeBLEU, print_bleu
 from itlearn.utils.metrics import Metrics, Best
 from itlearn.utils.misc import write_tb
+from itlearn.finetune.agents_utils import supervise_evaluate_loop
 
 
 def _get_nll(model, src, src_len, trg):
@@ -92,7 +93,7 @@ class Trainer:
         self.s2p_steps = args.__dict__.get('s2p_steps', args.max_training_steps)
         if self.use_s2p:
             args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
-            fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'], extra_input['s2p_its']['en_de']
+            fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'][0], extra_input['s2p_its']['en_de'][0]
             self.s2p_fr_en_it = iter(fr_en_it)
             self.s2p_en_de_it = iter(en_de_it)
 
@@ -122,6 +123,9 @@ class Trainer:
                 if iters % self.args.eval_every == 0:
                     self.model.eval()
                     self.evaluate(iters, best)
+                    self.supervise_evaluate(iters)
+                    if self.args.plot_grad:
+                        self._plot_grad(iters)
 
                 self.model.train()
                 self.train_step(iters, train_batch, train_metrics)
@@ -134,10 +138,6 @@ class Trainer:
                     train_stats['lr'] = self.opt.param_groups[0]['lr']
                     write_tb(self.writer, train_stats, iters, prefix="train/")
                     train_metrics.reset()
-
-                    if self.args.plot_grad:
-                        self.model.train()
-                        self._plot_grad(iters, train_batch)
 
                 iters += 1
         except (InterruptedError, KeyboardInterrupt):
@@ -240,6 +240,32 @@ class Trainer:
         for (dest, string) in zip(dest_folders, [en_corpus, de_hyp, en_hyp]):
             dest.write_text("\n".join(string), encoding="utf-8")
 
+    def supervise_evaluate(self, iters):
+        """ Perform several teacher forcing loop """
+        assert self.use_s2p
+        agents = ['fren', 'ende']
+        datasets = ['iwslt', 'multi30k']
+        dev_its = {'fren': {'iwslt': self.extra_input['s2p_its']['fr_en'][1],
+                            'multi30k': self.dev_it},
+                   'ende':{'iwslt': self.extra_input['s2p_its']['en_de'][1],
+                           'multi30k': self.dev_it}}
+        for agent in agents:
+            if agent == 'fren':
+                pair = "fr_en"
+                model = self.model.fr_en
+            else:
+                pair = "en_de"
+                model = self.model.en_de
+            for dset in datasets:
+                dev_it = dev_its[agent][dset]
+                dev_metrics, bleu = supervise_evaluate_loop(model, dev_it, dset, pair)
+                stats = {'nll': dev_metrics.nll, 'bleu': bleu[0], 'lengths': bleu[-1]}
+                logger_str = ["[{}|{}]".format(agent, dset)]
+                for key, val in stats.items():
+                    logger_str += ["{}: {:.4f}".format(key, val)]
+                    self.writer.add_scalar('supervise/{}/{}/{}'.format(agent, dset, key), val, global_step=iters)
+                self.args.logger.info(' '.join(logger_str))
+
     def _maybe_save(self, iters):
         if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:
             self.args.logger.info('save (back-up) checkpoints at iters={}'.format(iters))
@@ -259,31 +285,70 @@ class Trainer:
         decay_h = (self.args.h_co - h_co_end) * (self.args.h_co_anneal_steps - iters) / self.args.h_co_anneal_steps
         return max(0, decay_h) + h_co_end
 
-    def _plot_grad(self, iters, train_batch):
+    def _plot_grad(self, iters):
         """ plot the gradients for selfplau and supervise """
         assert self.use_s2p
+        self.model.train()
+        self.args.logger.info('Plotting Gradients...')
+        grads = {'sp': {}, 'su': {}}
         self.opt.zero_grad()
-        fwd_results = self.model(train_batch, en_lm=self.extra_input["en_lm"],
-                                 all_img=self.extra_input["img"]['multi30k'][0],
-                                 ranker=self.extra_input["ranker"])
-        total_loss = 0
-        for name, co in self.loss_cos.items():
-            if co == 0:
-                continue
-            assert fwd_results[name].grad_fn is not None
-            total_loss += co * fwd_results[name]
-        total_loss.backward()
-        rl_grad = torch.cat([p.grad.clone().reshape(-1) for p in self.params if p.grad is not None])
+        count = 0
+        for batch in self.dev_it:
+            count += 1
+            fwd_results = self.model(batch, en_lm=self.extra_input["en_lm"],
+                                     all_img=self.extra_input["img"]['multi30k'][0],
+                                     ranker=self.extra_input["ranker"])
+            total_loss = 0
+            for name, co in self.loss_cos.items():
+                if co == 0:
+                    continue
+                assert fwd_results[name].grad_fn is not None
+                total_loss += co * fwd_results[name]
+            total_loss.backward()
+        grads['sp']['fren'] = torch.cat([(p.grad.clone() / count).reshape(-1)
+                                         for p in self.model.fr_en.parameters() if p.grad is not None])
+        grads['sp']['ende'] = torch.cat([(p.grad.clone() / count).reshape(-1)
+                                         for p in self.model.en_de.parameters() if p.grad is not None])
+
+        # S2P grad
         self.opt.zero_grad()
-        fr_en_loss, en_de_loss = self._s2p_batch()
-        (fr_en_loss + en_de_loss).backward()
-        s2p_grad = torch.cat([p.grad.clone().reshape(-1) for p in self.params if p.grad is not None])
-        rl_grad_norm = torch.norm(rl_grad)
-        s2p_grad_norm = torch.norm(s2p_grad)
-        cosine = rl_grad.matmul(s2p_grad) / (rl_grad_norm * s2p_grad_norm)
-        self.writer.add_scalar("grad/rl_grad_norm", rl_grad_norm.item(), global_step=iters)
-        self.writer.add_scalar("grad/s2p_grad_norm", s2p_grad_norm.item(), global_step=iters)
-        self.writer.add_scalar("grad/cosine", cosine.item(), global_step=iters)
+        count = 0
+        fren_dev_it, ende_dev_it = self.extra_input['s2p_its']['fr_en'][1], self.extra_input['s2p_its']['en_de'][1]
+        for batch in fren_dev_it:
+            count += 1
+            fr_en_loss = _get_nll(self.model.fr_en,
+                                  batch.src[0],
+                                  batch.src[1],
+                                  batch.trg[0])
+            fr_en_loss.backward()
+        grads['su']['fren'] = torch.cat([(p.grad.clone() / count).reshape(-1)
+                                         for p in self.model.fr_en.parameters() if p.grad is not None])
+
+        self.opt.zero_grad()
+        count = 0
+        for batch in ende_dev_it:
+            count += 1
+            en_de_loss = _get_nll(self.model.en_de,
+                                  batch.src[0],
+                                  batch.src[1],
+                                  batch.trg[0])
+            en_de_loss.backward()
+        grads['su']['ende'] = torch.cat([(p.grad.clone() / count).reshape(-1)
+                                         for p in self.model.en_de.parameters() if p.grad is not None])
+
+        for agent in ['fren', 'ende']:
+            sp_grad = grads['sp'][agent]
+            su_grad = grads['su'][agent]
+            sp_grad_norm = torch.norm(sp_grad)
+            su_grad_norm = torch.norm(su_grad)
+            cosine = sp_grad.matmul(su_grad) / (sp_grad_norm * su_grad_norm)
+            self.writer.add_scalar("grad/norm/sp_{}".format(agent), sp_grad_norm.item(), global_step=iters)
+            self.writer.add_scalar("grad/norm/su_{}".format(agent), su_grad_norm.item(), global_step=iters)
+            self.writer.add_scalar("grad/cosine/{}".format(agent), cosine.item(), global_step=iters)
+            self.args.logger.info('[{}] sp norm: {:.4f} su norm: {:.4f} cosine: {:.4f}'.format(agent,
+                                                                                               sp_grad_norm.item(),
+                                                                                               su_grad_norm.item(),
+                                                                                               cosine.item()))
 
     def _s2p_batch(self):
         fr_en_batch = self.s2p_fr_en_it.__next__()
