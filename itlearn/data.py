@@ -14,13 +14,13 @@ def get_s2p_dataset(args):
     en_vocab, de_vocab, fr_vocab = "vocab.en.pth", "vocab.de.pth", "vocab.fr.pth"
     for pair in ['fr_en', 'en_de']:
         small_dataset = hasattr(args, 's2p_small') and args.s2p_small
-        _, _, train_it, _ = get_iwslt_iters(pair=pair, bpe_path=bpe_path,
-                                            de_vocab=de_vocab, batch_size=args.batch_size,
-                                            device=device, en_vocab=en_vocab,
-                                            fr_vocab=fr_vocab, train_repeat=True,
-                                            load_dataset=True, save_dataset=True,
-                                            training_max_len=None, small_dataset=small_dataset)
-        its[pair] = train_it
+        _, _, train_it, dev_it = get_iwslt_iters(pair=pair, bpe_path=bpe_path,
+                                                 de_vocab=de_vocab, batch_size=args.batch_size,
+                                                 device=device, en_vocab=en_vocab,
+                                                 fr_vocab=fr_vocab, train_repeat=True,
+                                                 load_dataset=True, save_dataset=True,
+                                                 training_max_len=None, small_dataset=small_dataset)
+        its[pair] = (train_it, dev_it)
     return its
 
 
