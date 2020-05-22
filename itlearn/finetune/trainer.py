@@ -92,7 +92,7 @@ class Trainer:
         self.use_s2p = hasattr(args, 's2p_freq') and args.s2p_freq > 0
         self.s2p_steps = args.__dict__.get('s2p_steps', args.max_training_steps)
         if self.use_s2p:
-            args.logger.info('Perform S2P at every {} steps'.format(args.s2p_freq))
+            args.logger.info('Perform S2P at every {} steps for {} maximum'.format(args.s2p_freq, self.s2p_steps))
             fr_en_it, en_de_it = extra_input['s2p_its']['fr_en'][0], extra_input['s2p_its']['en_de'][0]
             self.s2p_fr_en_it = iter(fr_en_it)
             self.s2p_en_de_it = iter(en_de_it)
