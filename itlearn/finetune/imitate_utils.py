@@ -135,7 +135,7 @@ def imitate_fr_en(args, student, teacher, train_it, dev_it, monitor_names, extra
     imitate_statss = []
     eval_freq = max(int(args.fr_en_k2 / 50), 5)
     iters = 0
-    s2p_fr_en_it = iter(extra_input['s2p_its']['fr_en'])
+    s2p_fr_en_it = iter(extra_input['s2p_its']['fr_en'][0])
     train_it = iter(train_it)
     while True:
         if iters >= args.fr_en_k2:
@@ -174,7 +174,7 @@ def imitate_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     iters = 0
-    s2p_en_de_it = iter(extra_input['s2p_its']['en_de'])
+    s2p_en_de_it = iter(extra_input['s2p_its']['en_de'][0])
     train_it = iter(train_it)
     while True:
         if iters >= args.en_de_k2:
@@ -211,7 +211,7 @@ def finetune_en_de(args, student, teacher, train_it, dev_it, opt, extra_input):
     imitate_statss = []
     eval_freq = max(int(args.en_de_k2 / 50), 5)
     iters = 0
-    s2p_en_de_it = iter(extra_input['s2p_its']['en_de'])
+    s2p_en_de_it = iter(extra_input['s2p_its']['en_de'][0])
     train_it = iter(train_it)
     while True:
         if iters >= args.en_de_k2:
