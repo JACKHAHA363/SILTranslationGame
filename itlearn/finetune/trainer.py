@@ -242,7 +242,6 @@ class Trainer:
 
     def supervise_evaluate(self, iters):
         """ Perform several teacher forcing loop """
-        assert self.use_s2p
         agents = ['fren', 'ende']
         datasets = ['iwslt', 'multi30k']
         dev_its = {'fren': {'iwslt': self.extra_input['s2p_its']['fr_en'][1],
@@ -287,7 +286,6 @@ class Trainer:
 
     def _plot_grad(self, iters):
         """ plot the gradients for selfplau and supervise """
-        assert self.use_s2p
         self.model.train()
         self.args.logger.info('Plotting Gradients...')
         grads = {'sp': {}, 'su': {}}
