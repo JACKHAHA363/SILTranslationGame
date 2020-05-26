@@ -27,79 +27,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 import math
 
-# The Tags that I care about
+# default tags and names
+from itlearn.utils.viz import combine_series, Series, parse_tb_event_files
+
 TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real', 'dev_neg_Hs']
 NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL', 'Neg Entropy']
 
-#TAGS = ['eval_bleu_de', 'eval_bleu_en', 'eval_en_nll_lm', 'eval_r1_acc', 'eval_nll_real']
-#NAMES = ['BLEU_De', 'BLEU_En', 'NLL', 'R1', 'Real NLL']
-# Plot Config
-NB_COL = 2
-NB_ROW = int((len(TAGS) + 1) / NB_COL)
 
-
-class Series:
-    def __init__(self):
-        self.values = []
-        self.steps = []
-
-    def add(self, step, val):
-        """ Insert step and value. Maintain sorted w.r.t. steps """
-        if len(self.steps) == 0:
-            self.steps.append(step)
-            self.values.append(val)
-        else:
-            for idx in reversed(range(len(self.steps))):
-                if step > self.steps[idx]:
-                    break
-            else:
-                idx = -1
-            self.steps.insert(idx + 1, step)
-            self.values.insert(idx + 1, val)
-
-    def verify(self):
-        for i in range(len(self.steps) - 1):
-            assert self.steps[i] <= self.steps[i + 1]
-
-
-def combine_series(series_list, use_median=False):
-    """
-    :param series_list: a list of `Series` assuming steps are aligned
-    :return: steps, values, stds
-    """
-    step_sizes = [len(series.steps) for series in series_list]
-    min_idx = np.argmin(step_sizes)
-    steps = series_list[min_idx].steps
-
-    # [nb_run, nb_steps]
-    all_values = [series.values[:len(steps)] for series in series_list]
-    if not use_median:
-        values = np.mean(all_values, axis=0)
-    else:
-        values = np.median(all_values, axis=0)
-    stds = np.std(all_values, axis=0)
-    return steps, values, stds
-
-
-def parse_tb_event_file(event_file):
-    data = {}
-    for e in tf.compat.v1.train.summary_iterator(event_file):
-        for v in e.summary.value:
-            tag = v.tag.replace('/', '_')
-            if tag in TAGS:
-                if data.get(tag) is None:
-                    data[tag] = Series()
-                if 'nll' in tag:
-                    data[tag].add(step=e.step, val=np.abs(v.simple_value))
-                else:
-                    data[tag].add(step=e.step, val=v.simple_value)
-
-    for tag in data:
-        data[tag].verify()
-    return data
-
-
-def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size, use_median):
+def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size, use_median, tags, names):
     data = {}
     min_steps = math.inf
     for exp_name in exp_names:
@@ -130,7 +65,7 @@ def plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size, use_median
         ax.fill_between(new_steps, new_means - new_stds, new_means + new_stds,
                         alpha=0.2)
     ax.set_xlabel('steps', fontsize=font_size)
-    ax.set_title(NAMES[TAGS.index(tag)])
+    ax.set_title(names[tags.index(tag)])
     ax.legend(fontsize=20)
 
 
@@ -140,7 +75,14 @@ def main():
     parser.add_argument('output_dir')
     parser.add_argument('-same_canvas', action='store_true')
     parser.add_argument('-use_median', action='store_true')
+    parser.add_argument('-tags', nargs='*')
+    parser.add_argument('-names', nargs='*')
     args = parser.parse_args()
+    tags = args.tags if args.tags is not None and len(args.tags) > 0 else TAGS
+    names = args.names if args.names is not None and len(args.names) > 0 else NAMES
+    assert len(tags) == len(names)
+    for name, tag in zip(names, tags):
+        print('Plot {} ({})'.format(name, tag))
 
     exp_names = [exp_name for exp_name in sorted(os.listdir(args.exp_dir)) if
                  os.path.isdir(os.path.join(args.exp_dir, exp_name))]
@@ -153,8 +95,7 @@ def main():
         runs = os.listdir(os.path.join(args.exp_dir, exp_name))
         print('We have {} runs for {}'.format(len(runs), exp_name))
         for run in runs:
-            event_file = os.listdir(os.path.join(args.exp_dir, exp_name, run))[0]
-            run_data = parse_tb_event_file(os.path.join(args.exp_dir, exp_name, run, event_file))
+            run_data = parse_tb_event_files(os.path.join(args.exp_dir, exp_name, run), tags)
             if len(run_data) == 0:
                 continue
             all_tags = list(run_data.keys())
@@ -165,7 +106,7 @@ def main():
     df = DataFrame(columns=all_tags)
     max_steps = {}
     for exp_name in exp_names:
-        steps, mean_de_bleus, _ = combine_series([run_data[TAGS[0]] for run_data in all_data[exp_name]])
+        steps, mean_de_bleus, _ = combine_series([run_data[tags[0]] for run_data in all_data[exp_name]])
         max_id = np.argmax(mean_de_bleus)
         max_step = steps[max_id]
         max_steps[exp_name] = max_step
@@ -179,11 +120,14 @@ def main():
 
     # Start plotting
     if args.same_canvas:
-        matplotlib.rc('font', size=18)
-        fig, axs = plt.subplots(NB_ROW, NB_COL, figsize=(13*NB_COL, 10*NB_ROW))
+        nb_col = 2
+        nb_row = int((len(tags) + 1) / nb_col)
+        matplotlib.rc('font', size=20)
+        fig, axs = plt.subplots(nb_row, nb_col, figsize=(13*nb_col, 10*nb_row))
         for tag, ax in zip(all_tags, axs.reshape([-1])):
             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10, use_median=args.use_median)
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=10, use_median=args.use_median,
+                          names=names, tags=tags)
         if args.use_median:
             fig.savefig(os.path.join(args.output_dir, 'result_median.png'))
         else:
@@ -195,8 +139,9 @@ def main():
             plt.xticks(fontsize=20)
             plt.yticks(fontsize=20)
             plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=20, use_median=args.use_median)
-            fig.savefig(os.path.join(args.output_dir, '{}.png'.format(NAMES[TAGS.index(tag)])),
+            plot_each_tag(all_data, ax, exp_names, max_steps, tag, font_size=20, use_median=args.use_median,
+                          names=names, tags=tags)
+            fig.savefig(os.path.join(args.output_dir, '{}.png'.format(names[tags.index(tag)])),
                         bbox_inches='tight')
 
 
