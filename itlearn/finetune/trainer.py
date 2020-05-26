@@ -123,7 +123,7 @@ class Trainer:
                 if iters % self.args.eval_every == 0:
                     self.model.eval()
                     self.evaluate(iters, best)
-                    self.supervise_evaluate(iters)
+                    #self.supervise_evaluate(iters)
                     if self.args.plot_grad:
                         self._plot_grad(iters)
 
