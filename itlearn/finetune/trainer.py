@@ -224,7 +224,6 @@ class Trainer:
     def evaluate(self, iters, best):
         """ Free Run """
         eval_metric, bleu_en, bleu_de, en_corpus, en_hyp, de_hyp = self.evaluate_communication()
-        bleu_names = ['bleu', 'len_hyp']
         write_tb(self.writer, {'bleu': bleu_en[0], 'len_hyp': bleu_en[-1]}, iters, prefix='bleu_en/')
         write_tb(self.writer, {'bleu': bleu_de[0], 'len_hyp': bleu_de[-1]}, iters, prefix='bleu_de/')
         write_tb(self.writer, {"bleu_en": bleu_en[0], "bleu_de": bleu_de[0]}, iters, prefix="eval/")
@@ -242,28 +241,11 @@ class Trainer:
 
     def supervise_evaluate(self, iters):
         """ Perform several teacher forcing loop """
-        agents = ['fren', 'ende']
-        datasets = ['iwslt', 'multi30k']
-        dev_its = {'fren': {'iwslt': self.extra_input['s2p_its']['fr_en'][1],
-                            'multi30k': self.dev_it},
-                   'ende':{'iwslt': self.extra_input['s2p_its']['en_de'][1],
-                           'multi30k': self.dev_it}}
-        for agent in agents:
-            if agent == 'fren':
-                pair = "fr_en"
-                model = self.model.fr_en
-            else:
-                pair = "en_de"
-                model = self.model.en_de
-            for dset in datasets:
-                dev_it = dev_its[agent][dset]
-                dev_metrics, bleu = supervise_evaluate_loop(model, dev_it, dset, pair)
-                stats = {'nll': dev_metrics.nll, 'bleu': bleu[0], 'lengths': bleu[-1]}
-                logger_str = ["[{}|{}]".format(agent, dset)]
-                for key, val in stats.items():
-                    logger_str += ["{}: {:.4f}".format(key, val)]
-                    self.writer.add_scalar('supervise/{}/{}/{}'.format(agent, dset, key), val, global_step=iters)
-                self.args.logger.info(' '.join(logger_str))
+        dev_metrics, _ = supervise_evaluate_loop(self.mode.fr_en, dev_it=self.dev_it, dataset='multi30k',
+                                                 pair='fr_en')
+        for key in dev_metrics.metrics:
+            self.writer.add_scalar('supervise/{}'.format(key), dev_metrics.__getattr__(key),
+                                   global_step=iters)
 
     def _maybe_save(self, iters):
         if hasattr(self.args, 'save_every') and iters % self.args.save_every == 0:

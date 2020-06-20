@@ -25,6 +25,7 @@ w_src = [csv_file for csv_file in csv_files if 'w_src' in csv_file]
 
 
 def read_csv(csv_path):
+    """ Read info from csv. Throw the exception if CSV is invalid """
     state = 'init'
     results = []
     buffer = []
@@ -51,6 +52,8 @@ def read_csv(csv_path):
                         state = 'init'
         except ValueError:
             ipdb.set_trace()
+    print('NB experiments:', len(results))
+    assert len(results) > 0
 
     # Deal with results
     win_mat = np.zeros([len(methods), len(methods)])
