@@ -123,7 +123,7 @@ class Trainer:
                 if iters % self.args.eval_every == 0:
                     self.model.eval()
                     self.evaluate(iters, best)
-                    #self.supervise_evaluate(iters)
+                    self.supervise_evaluate(iters)
                     if self.args.plot_grad:
                         self._plot_grad(iters)
 
@@ -241,7 +241,7 @@ class Trainer:
 
     def supervise_evaluate(self, iters):
         """ Perform several teacher forcing loop """
-        dev_metrics, _ = supervise_evaluate_loop(self.mode.fr_en, dev_it=self.dev_it, dataset='multi30k',
+        dev_metrics, _ = supervise_evaluate_loop(self.model.fr_en, dev_it=self.dev_it, dataset='multi30k',
                                                  pair='fr_en')
         for key in dev_metrics.metrics:
             self.writer.add_scalar('supervise/{}'.format(key), dev_metrics.__getattr__(key),
